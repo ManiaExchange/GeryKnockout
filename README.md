@@ -60,7 +60,7 @@ More detailed information can be found in the docs folder:
 
 ## Setting up for development
 
-Clone this repository to a folder of your choice. Using Visual Studio Code and PHP Intelephense is recommended. Using this setup, copy `tm_gery.php`, `includes\plugin_manager.php` and `includes\GbxRemote.php` (repository coming soon) to a new top level folder `dependencies`.
+Clone this repository to a folder of your choice. Using Visual Studio Code and PHP Intelephense is recommended. Using this setup, copy `tm_gery.php`, `includes\plugin_manager.php` and `includes\GbxRemote.php` from the TMGery installation to a new top level folder `dependencies`.
 
 ## Reporting an issue
 
