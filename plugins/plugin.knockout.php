@@ -509,7 +509,7 @@ class Scores
     private $isAscending; // True for Stunts, false for TA and Rounds
 
     /**
-     * Creates an empty scores module.
+     * Creates an empty scores instance.
      */
     public function __construct()
     {
@@ -1202,7 +1202,7 @@ class UI
             }
             else
             {
-                if ($timeOrScore > 0) return $formatTime($timeOrScore);
+                if ($timeOrScore >= 0) return $formatTime($timeOrScore);
                 elseif ($timeOrScore === Scores::DidNotFinish) return 'DNF';
                 else return '';
             }
@@ -4393,7 +4393,7 @@ class KnockoutRuntime
         if ($issuer[0] === 'voyager006')
         {
             Log::debug('test1 1');
-            $this->playerList->applyStatusTransition(PlayerStatus::Playing, PlayerStatus::Spectating);
+            $this->playerList->applyStatusTransition(PlayerStatus::Playing, PlayerStatus::Shelved);
             Log::debug('test1 2');
         }
         else

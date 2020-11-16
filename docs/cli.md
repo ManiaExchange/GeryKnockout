@@ -7,17 +7,21 @@
 Starts the knockout. If "now" is given, the current track will be skipped; otherwise the knockout will be scheduled to start on the next round (or after the warmup, if there currently is one). All players will be forced to play unless they opt out using `/opt out`.
 
 ### /ko stop
+
 Stops the knockout with immediate effect. Knocked out players are put to play; spectating players remain in spec but can choose to leave spectator mode.
 
 ### /ko skip [warmup]
+
 Skips the current track. If "warmup" is given, only the warmup is skipped. During a tiebreaker, will exit the tiebreaker and resume the knockout.
 
 ### /ko restart [warmup]
+
 Restarts the current track, or the current round if in Rounds. If "warmup" is given, the track is restarted with a warmup.
 
 Note: `/ko restart warmup` will exit a tiebreaker.
 
 ### /ko add (*login* | \*)
+
 Adds a player with login `login` to the knockout. If the wildcard `*` is used, then everyone on the server is added to the knockout. The number of lives will be equal to the value set with `/ko lives`.
 
 Examples:
@@ -30,6 +34,7 @@ Note: if a player is reinstated and can't set a time/score on the current round,
 Note: adding players during a tiebreaker will make them able to play once the tiebreaker has ended. The tiebreaker will continue as normal, with the losing players losing a life.
 
 ### /ko remove (*login* | \*)
+
 Removes a player with login `login` from the knockout, regardless of how many lives they have. If the wildcard `*` is used, then everyone that are currently playing are removed from the knockout. If applied during a round, the player(s) will be put in spec and their runs will count as DNF (regardless whether they finished or not).
 
 Examples:
@@ -40,9 +45,11 @@ Examples:
 Note: `/ko remove *` will exit a tiebreaker.
 
 ### /ko spec (*login* | \*)
+
 Same as `/ko remove` but instead puts the player into spectator status. Use if a knocked out player is afk and becomes a cause of synchronization delays.
 
 ### /ko lives (*login* | \*) [[+ | -]*lives*]
+
 Displays or adjusts the number of lives to use for the knockout. When adjusting, the number of lives may be relative (by using a plus or minus sign in front of the number of lives) or absolute. The change may be applied to a single player (using their login) or to everyone who is currently playing (using the wildcard `*`). Knocked out players are not reinstated unless when specified by a login. If the number of lives is not supplied, the current number of lives for the given player(s) are displayed in chat.
 
 This command can be used during a knockout; players will get the same number of lives or get knocked out depending on what the new number is set to.
@@ -65,6 +72,7 @@ Note: `/ko lives * x` will restore lost lives; everyone will have the same amoun
 Default: 1
 
 ### /ko multi (constant *kos* | extra *per_x_players* | dynamic *total_rounds* | none)
+
 Sets the KO multiplier mode:
 - Constant: `x` KOs per round.
 - Extra: +1 KO for every `x`'th player, such that if `x` = 10 then there will be 1 KO for 2-10 players, 2 KOs for 11-20, 3 KOs for 21-30, and so on.
@@ -76,6 +84,7 @@ Note: adjusting the multiplier is not possible during a tiebreaker.
 Default: None
 
 ### /ko rounds *rounds*
+
 Sets the number of rounds per track to play in Rounds. If it's the last round, the change will take effect on the next track. 
 
 Note: issuing this command will not enforce Rounds game mode to be played.
@@ -83,41 +92,51 @@ Note: issuing this command will not enforce Rounds game mode to be played.
 Default: 1
 
 ### /ko openwarmup (on | off)
+
 Enables or disables open warmup which lets knocked out players play during warmup.
 
 Default: on
 
 ### /ko falsestart *max_tries*
+
 Sets the limit for how many times the round will be restarted if someone retires before the countdown (known TMF bug). Set to 0 to disable.
 
 Default: 2
 
 ### /ko tiebreaker (on | off)
+
 Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and at not all of them would be knocked out. Once invoked, all other players are shelved (put to spec momentarily) and the track is restarted with only the tied players racing. If set to off, ties are broken by when they were submitted; times which are set earlier are preferred.
 
 Default: on
 
 ### /ko authorskip *for_top_x_players*
+
 Automatically skips a track when its author is present, once a given player count has been reached. Set to 0 to disable.
 
 Default: 7
 
 ### /ko settings
+
 Displays knockout settings such as multiplier, lives, open warmup, etc in the chat. Also shown when starting a knockout.
 
 ### /ko status
+
 Shows knockout mode, knockout status, player list and scores in a dialog window. For debugging purposes.
 
 ### /ko help
+
 Shows the list of commands.
 
 ## Public commands
 
 ### /info
+
 Displays information about the knockout.
 
 ### /opt in
+
 Rejoins the knockout after having opted out. Works only if you're still eligible to join (the live round has not started yet).
 
 ### /opt out
+
 Puts yourself out of an upcoming or ongoing knockout. If applied during a round, your run will count as a DNF (regardless whether you finished or not).

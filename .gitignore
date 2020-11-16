@@ -1,3 +1,7 @@
+##### Specific to this project
+# Files needed for PHP Intelephense
+dependencies/
+
 ##### Windows
 # Windows thumbnail cache files
 Thumbs.db
