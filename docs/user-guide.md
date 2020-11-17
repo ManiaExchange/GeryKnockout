@@ -17,18 +17,6 @@ The plugin includes a command-line interface which can be used to configure the 
 
 ### Running a knockout
 
-The knockout can be customized by the following commands:
-
-- [/ko lives](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives)
-- [/ko multi](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none)
-- [/ko rounds](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-rounds-rounds)
-- [/ko openwarmup](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-openwarmup-on--off)
-- [/ko falsestart](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-falsestart-max_tries)
-- [/ko tiebreaker](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off)
-- [/ko authorskip](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-authorskip-for_top_x_players)
-
-These settings are displayed when starting the knockout, but you can use `/ko settings` to display them as well.
-
 To start the knockout, use [/ko start](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-start-now). This command may be combined with others depending on the usage:
 
 - `/ko start`
@@ -48,7 +36,7 @@ To start the knockout, use [/ko start](https://github.com/ManiaExchange/GeryKnoc
 
 When starting the knockout, all players are put to play. If someone doesn't want to play, let them know about [opting out](#opting-out).
 
-During the knockout, the following commands may be used if necessary:
+During the knockout, the following commands may be used for moderation:
 
 - [/ko skip [warmup]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-skip-warmup) - skips the current warmup or track
 - [/ko restart [warmup]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-restart-warmup) - restarts the current round or track
@@ -60,14 +48,24 @@ During the knockout, the following commands may be used if necessary:
 - [/ko lives * *lives*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives) - sets the given number of lives for all player
 - [/ko stop](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-stop) - stops the knockout with immediate effect
 
+The knockout can be further customized by the following settings:
+
+- [/ko multi (constant *kos* | extra *per_x_players* | dynamic *total_rounds* | none)](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) - perform multiple KOs per round
+- [/ko rounds *rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-rounds-rounds) - sets the number of rounds per track (Rounds only)
+- [/ko openwarmup (on | off)](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-openwarmup-on--off) - lets players drive during warmups
+- [/ko falsestart *max_tries*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-falsestart-max_tries) - sets the limit for how many times a round is restarted because of someone retiring before it starts
+- [/ko tiebreaker (on | off)](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off) - use a custom tiebreaker mode in case of ties
+- [/ko authorskip *for_top_x_players*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-authorskip-for_top_x_players) - skip tracks if the author is participating
+
+These settings are displayed when starting the knockout, but you can use `/ko settings` to display them as well.
+
 A full overview of the commands is listed in [cli.md](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md).
 
-## Settings
+## Configuration
 
 ### Allow knocked out players to play during warmup
 Players who have been knocked out are able to play during warmups if `/ko openwarmup` is enabled. This does not apply to spectators; if a player wants to be spectating instead, they can enter spectator mode during a warmup or a podium. Same thing applies the other way; if a spectator wants to play during warmups, leave spectator mode during a warmup or a podium. This also applies to shelved players during tiebreakers.
 
-#### Password
 The plugin does not put a password on the server during a knockout. If a player joins the server (spec as well), they'll be forced in if they are eligible. If not, their status will be `Knocked out` if they joined using *Play* and `Spectator` if they joined as a spectator. When the knockout is stopped, everyone is free to play unless a password is set manually.
 
 Likewise, if someone disconnects during a knockout, they will be eligible to join if they are not knocked out yet. If there is a disconnection during the warmup, they may rejoin until the next live round has ended.
@@ -118,13 +116,13 @@ You can control how many KOs are performed each round by using a KO multiplier; 
 | Dynamic | [/ko multi dynamic *total_rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | A hybrid algorithm which aims for `total_rounds` rounds throughout the knockout. It starts off with 1 KO per round, then progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds. |
 
 #### How the dynamic multiplier works
-Among these multipliers, Dynamic is perhaps the most advanced one. In essence, it is about approximating the total number of KOs such that the total number of rounds equals the desired number of rounds.
+Among these multipliers, Dynamic is without doubt the most advanced one, so let's take a moment to see how it works. In essence, it is about approximating the total number of KOs such that the total number of rounds equals the desired number of rounds.
 
-First, a base curve is defined. It defines the relative amount of additional KOs per round over the baseline of 1 KO/round.
+First, a base curve `base_curve(r)` is defined. It defines the relative amount of additional KOs per round `r` over the baseline of 1 KO/round.
 
 ![Base curve](img/base-curve.png)
 
-Then, the goal is to find the target scaled curve `c(r) = a * base_curve(r) + 1` such that the sum over `c(r)` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c(r)` until we find a value for `a` of which the sum of `c(r)` equals the total number of KOs.
+Then, the goal is to find a discretized, scaled curve `c(r) = a * base_curve(r) + 1` such that the sum over `c(r)` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c(r)` until we find a value for `a` of which the sum of `c(r)` equals the total number of KOs. This generally takes a few tries to 
 
 With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and player count will look like the following:
 
