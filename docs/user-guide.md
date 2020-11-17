@@ -124,17 +124,17 @@ First, a base curve `base_curve(r)` is defined. It defines the relative amount o
 
 Then, the goal is to find a discretized, scaled curve `c(r) = a * base_curve(r) + 1` such that the sum over `c(r)` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c(r)` until we find a value for `a` of which the sum of `c(r)` equals the total number of KOs.
 
-With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and player count will look like the following:
+With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and overall player count will look like the following:
 
 ![KOs per round](img/example1-kos.png) ![Player count](img/example1-players.png)
 
-Each round, the curve is recalculated to adjust for any inaccuracies. In the case of a mass KO, the curve is readjusted because the remaining number of KOs becomes reduced, thus leading to a more straightened curve. The graphs below show where, in a 100 player knockout, how the curve is adjusted after a round with 10 DNFs:
+Each round, the curve is recalculated to adjust for any inaccuracies. In the case of a mass KO, the curve adjusts itself because the remaining number of KOs becomes reduced, thus leading to a more straightened curve. The graphs below show where, in a 100 player knockout, how the curve is adjusted after a round with 10 additional DNFs:
 
 ![KOs per round](img/example2-kos.png) ![Player count](img/example2-players.png)
 
 The algorithm is also defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
 
-Using this approach, we can observe that the number of KOs/round will not increase and decrease steadily; the number of KOs/round will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
+Using this approach, we can observe that the number of KOs/round will increase and decrease steadily; the number of KOs/round will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
 
 ### Lives
 Players may be configured to have multiple lives. This can be configured before the start of the knockout, or while a knockout is in progress. By default, each player has 1 life.
@@ -149,10 +149,10 @@ In Rounds, the number of rounds is enforced by using [/ko rounds *rounds*](https
 In order to do this, the plugin enforces a custom points partition. Every surviving player is given 1 point, and knocked out players are given 0. The points limit can therefore be used to determine the number of rounds per track. This overrides the server's current points partition.
 
 ### False starts
-The plugin includes false start detection, as TMGery does not provide this natively. If someone retires before the race starts, the round will be restarted. This is limited to two times per round, but can be adjusted or disabled using [/ko falsestart](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-falsestart-max_tries).
+The plugin includes false start detection, as TMGery does not provide this natively. If someone retires before the race starts, the round will be restarted. This is limited to two times per round, but can be adjusted or disabled using [/ko falsestart *max_tries*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-falsestart-max_tries).
 
 ### Automatic skip of author tracks
-When proceeding to the next track, and with few players in the knockout, the script will skip the next track if the author is still in. This is to prevent excessive advantage by playing their own tracks in the final rounds. When and if this should kick in is determined by [/ko authorskip](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-authorskip-for_top_x_players); the default is to be enabled for top 7, but can be disabled by setting to 0.
+When proceeding to the next track, and with few players in the knockout, the script will skip the next track if the author is still in. This is to prevent excessive advantage by playing their own tracks in the final rounds. When and if this should kick in is determined by [/ko authorskip *for_top_x_players*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-authorskip-for_top_x_players); the default is to be enabled for top 7, but can be disabled by setting to 0.
 
 ## HUD
 The plugin includes a status bar showing knockout status and player status, and a scoreboard showing which players are in risk of getting knocked out.
