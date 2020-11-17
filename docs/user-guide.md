@@ -103,6 +103,8 @@ Player 20   1:20.03
 
 In this case, player 20 will be knocked out regardless. However, players 4, 9 and 12 are tied and will therefore enter tiebreaker mode. In the tiebreaker, there will be 2 KOs performed since two of the players would have been knocked out otherwise.
 
+Tiebreakers will not initiate if the tied players DNF.
+
 This mode can be disabled using [/ko tiebreaker](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off). If disabled, ties are broken by when they were submitted; times which are set earlier are preferred.
 
 ### KO multiplier
@@ -113,7 +115,7 @@ You can control how many KOs are performed each round by using a KO multiplier; 
 | None | [/ko multi none](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | No multiplier; 1 KO per round. |
 | Constant | [/ko multi constant *kos*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | A constant number of KOs per round. |
 | Extra | [/ko multi extra *per_x_players*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | An extra KO per X players. If `per_x_players` = 10 then there will be 1 KO for 2-10 players, 2 KOs for 11-20, 3 KOs for 21-30, and so on. |
-| Dynamic | [/ko multi dynamic *total_rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | A hybrid algorithm which aims for `total_rounds` rounds throughout the knockout. It starts off with 1 KO, then progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds. |
+| Dynamic | [/ko multi dynamic *total_rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | A hybrid algorithm which aims for `total_rounds` rounds throughout the knockout. It starts off with 1 KO per round, then progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds. |
 
 #### How the dynamic multiplier works
 Among these multipliers, Dynamic is perhaps the most advanced one. In essence, it is about approximating the total number of KOs such that the total number of rounds equals the desired number of rounds.
@@ -124,17 +126,17 @@ First, a base curve is defined. It defines the relative amount of additional KOs
 
 Then, the goal is to find the target scaled curve `c(r) = a * base_curve(r) + 1` such that the sum over `c(r)` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c(r)` until we find a value for `a` of which the sum of `c(r)` equals the total number of KOs.
 
-With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs per round and player count will look like the following:
+With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and player count will look like the following:
 
 ![KOs per round](img/example1-kos.png) ![Player count](img/example1-players.png)
 
-Each round, the curve is recalculated to adjust for any inaccuracies. In the case of a mass KO, the curve is readjusted because the remaining number of KOs are now reduced, thus leading to a more straightened curve. The illustrations show where, in a 100 player knockout, how the curve is adjusted after a round with 10 DNFs:
+Each round, the curve is recalculated to adjust for any inaccuracies. In the case of a mass KO, the curve is readjusted because the remaining number of KOs becomes reduced, thus leading to a more straightened curve. The graphs below show where, in a 100 player knockout, how the curve is adjusted after a round with 10 DNFs:
 
 ![KOs per round](img/example2-kos.png) ![Player count](img/example2-players.png)
 
-The algorithm is also defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothened") by 1 KO for that round only.
+The algorithm is also defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
 
-Using this approach, we can observe that the number of KOs per round will not increase and decrease steadily; the number of KOs per round will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
+Using this approach, we can observe that the number of KOs/round will not increase and decrease steadily; the number of KOs/round will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
 
 ### Lives
 Players may be configured to have multiple lives. This can be configured before the start of the knockout, or while a knockout is in progress. By default, each player has 1 life.

@@ -2439,16 +2439,11 @@ class KnockoutRuntime
 
     /**
      * Skips the upcoming map(s) until the author is not present in the KO.
-     * 
-     * @param SChallengeInfo $nextChallenge The challenge to be played next.
      */
-    private function replaceNextTrackIfNeeded($nextChallenge)
+    private function replaceNextTrackIfNeeded()
     {
         $nbSkips = 0;
-        if (is_null($nextChallenge))
-        {
-            $nextChallenge = QueryManager::queryWithResponse('GetNextChallengeInfo');
-        }
+        $nextChallenge = QueryManager::queryWithResponse('GetNextChallengeInfo');
         $authorIsStillIn = $this->playerList->hasStatus($nextChallenge['Author'], PlayerStatus::Playing);
         $maxSkips = $this->authorSkipLimit;
 
@@ -3275,7 +3270,7 @@ class KnockoutRuntime
      * 
      *     $args = [
      *         [0] => (SPlayerRanking[]) The final rankings.
-     *         [1] => (SChallengeInfo) The upcoming challenge.
+     *         [1] => (SChallengeInfo) The current challenge.
      *     ]
      */
     public function onEndRace($args)
@@ -3301,7 +3296,7 @@ class KnockoutRuntime
                     $playerCount = count($this->playerList->getAll());
                     if ($playerCount <= $this->authorSkip)
                     {
-                        $this->replaceNextTrackIfNeeded($args[1]);
+                        $this->replaceNextTrackIfNeeded();
                     }
                     // Put user selectable for KO'd and spectating players during podium
                     $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
