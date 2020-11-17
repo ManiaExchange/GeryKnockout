@@ -3645,19 +3645,38 @@ class KnockoutRuntime
                             return;
                         }
                         
-                        $this->add($playersToAdd);
-                        if ($args[1] === '*')
+                        $playersToAdd = array_filter(
+                            $playersToAdd, 
+                            function($player) { return !PlayerStatus::isIn($player['Status']); }
+                        );
+                        if (count($playersToAdd) === 0)
                         {
-                            Chat::info('All players have been added to the KO');
+                            if ($args[1] === '*')
+                            {
+                                $onError('All players are already playing');
+                            }
+                            else
+                            {
+                                $onError(sprintf('$fff%s$g is already playing', $args[1]));
+                            }
                         }
                         else
                         {
-                            Chat::info(sprintf('%s$z$s$g has been added to the KO', $playersToAdd[0]['NickName']));
+                            $this->add($playersToAdd);
+                            if ($args[1] === '*')
+                            {
+                                Chat::info('All players have been added to the KO');
+                            }
+                            else
+                            {
+                                Chat::info(sprintf('%s$z$s$g has been added to the KO', $playersToAdd[0]['NickName']));
+                            }
                         }
                     }
                     break;
     
                 // /ko remove (<login> | *)
+                // /ko spec (<login> | *)
                 case 'remove':
                 case 'spec':
                     if ($this->koStatus === KnockoutStatus::Idle)
@@ -3691,26 +3710,62 @@ class KnockoutRuntime
 
                         if ($args[0] === 'remove')
                         {
-                            $this->remove($playersToRemove, PlayerStatus::KnockedOut);
-                            if ($args[1] === '*')
+                            $playersToRemove = array_filter(
+                                $playersToRemove, 
+                                function($player) { return $player['Status'] !== PlayerStatus::KnockedOut; }
+                            );
+                            if (count($playersToRemove) === 0)
                             {
-                                Chat::info('All players have been removed from the KO');
+                                if ($args[1] === '*')
+                                {
+                                    $onError('All players are already knocked out');
+                                }
+                                else
+                                {
+                                    $onError(sprintf('$fff%s$g is already knocked out', $args[1]));
+                                }
                             }
                             else
                             {
-                                Chat::info(sprintf('%s$z$s$g has been removed from the KO', $playersToRemove[0]['NickName']));
+                                $this->remove($playersToRemove, PlayerStatus::KnockedOut);
+                                if ($args[1] === '*')
+                                {
+                                    Chat::info('All players have been removed from the KO');
+                                }
+                                else
+                                {
+                                    Chat::info(sprintf('%s$z$s$g has been removed from the KO', $playersToRemove[0]['NickName']));
+                                }
                             }
                         }
                         else
                         {
-                            $this->remove($playersToRemove, PlayerStatus::KnockedOutAndSpectating);
-                            if ($args[1] === '*')
+                            $playersToRemove = array_filter(
+                                $playersToRemove, 
+                                function($player) { return $player['Status'] !== PlayerStatus::KnockedOutAndSpectating; }
+                            );
+                            if (count($playersToRemove) === 0)
                             {
-                                Chat::info('All players have been put to spec');
+                                if ($args[1] === '*')
+                                {
+                                    $onError('All players are already spectating');
+                                }
+                                else
+                                {
+                                    $onError(sprintf('$fff%s$g is already spectating', $args[1]));
+                                }
                             }
                             else
                             {
-                                Chat::info(sprintf('%s$z$s$g has been put to spec', $playersToRemove[0]['NickName']));
+                                $this->remove($playersToRemove, PlayerStatus::KnockedOutAndSpectating);
+                                if ($args[1] === '*')
+                                {
+                                    Chat::info('All players have been put to spec');
+                                }
+                                else
+                                {
+                                    Chat::info(sprintf('%s$z$s$g has been put to spec', $playersToRemove[0]['NickName']));
+                                }
                             }
                         }
                     }
