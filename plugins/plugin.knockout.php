@@ -1512,7 +1512,7 @@ class KOMultiplier
     {
         return function($round)
         {
-            $transition = 15.25; // round where the amount of kos reaches 1 ko/round again
+            $transition = $this->value - 4.75; // round where the amount of kos reaches 1 ko/round again
             if ($round < $transition)
             {
                 return 1 - cos($round * M_PI / ($transition / 2));
@@ -3296,6 +3296,7 @@ class KnockoutRuntime
             case KnockoutStatus::Running:
                 if ($this->isPodium)
                 {
+                    $this->scores->reset();
                     UI::hideScoreboard();
                     $playerCount = count($this->playerList->getAll());
                     if ($playerCount <= $this->authorSkip)
@@ -3315,6 +3316,7 @@ class KnockoutRuntime
 
             case KnockoutStatus::RestartingRound:
             case KnockoutStatus::RestartingTrack:
+                $this->scores->reset();
                 UI::hideScoreboard();
                 break;
 
@@ -3322,6 +3324,7 @@ class KnockoutRuntime
                 break;
 
             case KnockoutStatus::SkippingTrack:
+                $this->scores->reset();
                 UI::hideScoreboard();
                 if ($this->isPodium)
                 {
@@ -4323,10 +4326,10 @@ class KnockoutRuntime
             )),
             
             implode("\n", array(
-                'When the knockout starts, everyone is put to play. If the HUD is enabled, a status bar is shown at the top ',
-                '(click on the TMGery button on the top left if it doesn\'t). We usually play Rounds with one',
+                'When the knockout starts, everyone is put to play. If the HUD is enabled, a status bar is shown at the top',
+                '(click on the TMGery button on the top left to enable/disable). We usually play Rounds with one',
                 'warmup and one live round for each track. At the end of each round, the last placed driver, or all those',
-                'who do not finish the race, are out of the competition until one player remains as the winner.'
+                'who do not finish the race, are knocked out until one player remains as the winner.'
             )),
 
             implode("\n", array(
@@ -4337,8 +4340,8 @@ class KnockoutRuntime
             )),
 
             implode("\n", array(
-                'If you do get knocked out, don\'t fret! There are multiple knockouts to be played, and you can participate',
-                'again if you wait for the next knockout.'
+                'If you do get knocked out, don\'t fret! You can still play during warmups, and there are multiple knockouts',
+                'to be played; you can participate again if you wait for the next knockout.'
             )),
 
             'The most important part is: never give up! Someone may have retired :)',
@@ -4368,6 +4371,10 @@ class KnockoutRuntime
         if (!isset($args[0]))
         {
             Chat::error('Syntax error: expected an argument (usage: $fff/opt out$g)', array($issuerLogin));
+        }
+        elseif (isset($args[1]))
+        {
+            Chat::error('Syntax error: too many arguments (usage: $fff/opt out$g)', array($issuerLogin));
         }
         elseif (strtolower($args[0]) === 'in')
         {

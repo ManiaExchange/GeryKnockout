@@ -1,4 +1,4 @@
-# Command-line interface
+# CLI reference
 
 ## Admin commands
 
@@ -37,6 +37,8 @@ Examples:
 - `/ko remove *` - puts everyone who's playing out of the knockout
 
 Note: `/ko remove *` will exit a tiebreaker.
+
+Note: if the command was performed during a round and `/ko restart` or `/ko skip` is used afterwards, the player will remain in the knockout.
 
 ### /ko spec (*login* | \*)
 Same as `/ko remove` but instead puts the player into spectator status. Use if a knocked out player is afk and becomes a cause of synchronization delays.

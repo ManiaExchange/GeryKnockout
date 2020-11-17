@@ -5,6 +5,7 @@ Knockout plugin for the TMGery Trackmania Forever server controller.
 This repository contains a plugin for TMGery that enables knockout competitions to be held. Each round, the last players to finish, or those who don't finish, are knocked out until one player remains as the winner.
 
 ## Prerequisites
+- Trackmania dedicated server
 - PHP 5.3 or higher
 - TMGery
 - DedDerek's plugin manager
@@ -43,8 +44,8 @@ Clone this repository to a folder of your choice. Using Visual Studio Code and P
 ## Details
 More detailed information can be found in the docs folder:
 
-- [Command-line interface](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md)
-- [Release notes](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/release-notes.md)
+- [CLI reference](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md)
+- [User guide](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md)
 
 ## Reporting an issue
 If you encounter a bug or a plugin crash, create an issue here on GitHub. Try to supply the following information:
@@ -53,7 +54,7 @@ If you encounter a bug or a plugin crash, create an issue here on GitHub. Try to
 - A snapshot using `/ko status` (if the plugin didn't crash)
 - The log in the console window (if you have access)
 
-An extra step in the debugging process is to set MinimumLogLevel to Log::Debug in `plugin.knockout.php` in order to get more information in the console window. Note that this may have a negative impact on the server performance.
+An extra step in the debugging process is to set `MinimumLogLevel` to `Log::Debug` in `plugin.knockout.php` in order to get more information in the console window. Note that this may have a negative impact on the server performance.
 
 ## Screenshots
 ![Status bar](https://cdn.discordapp.com/attachments/770396713726509146/770607874531524628/unknown.png)
@@ -63,9 +64,11 @@ An extra step in the debugging process is to set MinimumLogLevel to Log::Debug i
 ![Prompt when opting out of the knockout](https://cdn.discordapp.com/attachments/770396713726509146/771888724052934676/unknown.png)
 
 ## Credits
-[@stefan-baumann](https://github.com/stefan-baumann) for the dynamic KO multiplier algorithm
+MrA for suggesting a progressive KO multiplier and [@stefan-baumann](https://github.com/stefan-baumann) for creating the algorithm
 
 Dennis for suggesting the syntax for the `/ko lives` command
+
+Realspace for suggesting the tiebreaker mode
 
 CavalierDeVache for the original plugin
 
