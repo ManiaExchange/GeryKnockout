@@ -122,7 +122,7 @@ First, a base curve `base_curve(r)` is defined. It defines the relative amount o
 
 ![Base curve](img/base-curve.png)
 
-Then, the goal is to find a discretized, scaled curve `c(r) = a * base_curve(r) + 1` such that the sum over `c(r)` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c(r)` until we find a value for `a` of which the sum of `c(r)` equals the total number of KOs. This generally takes a few tries to 
+Then, the goal is to find a discretized, scaled curve `c(r) = a * base_curve(r) + 1` such that the sum over `c(r)` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c(r)` until we find a value for `a` of which the sum of `c(r)` equals the total number of KOs.
 
 With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and player count will look like the following:
 
