@@ -120,17 +120,17 @@ Among these multipliers, Dynamic is without doubt the most advanced one, so let'
 
 First, a base curve `base_curve(r)` is defined. It defines the relative amount of additional KOs per round `r` over the baseline of 1 KO/round.
 
-![Base curve](img/base-curve.png)
+<img src="img/dynamic-kos-base-curve.png" height="320">
 
-Then, the goal is to find a discretized, scaled curve `c(r) = a * base_curve(r) + 1` such that the sum over `c(r)` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c(r)` until we find a value for `a` of which the sum of `c(r)` equals the total number of KOs.
+Then, the goal is to find a discretized, scaled curve `c[r] = [a * base_curve(r)] + 1` such that the sum over `c[r]` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c[r]` until we find a value for `a` of which the sum of `c[r]` equals the total number of KOs.
 
 With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and overall player count will look like the following:
 
-![KOs per round](img/example1-kos.png) ![Player count](img/example1-players.png)
+![Player count and KOs per round](img/dynamic-kos-example-normal.png)
 
-Each round, the curve is recalculated to adjust for any inaccuracies. In the case of a mass KO, the curve adjusts itself because the remaining number of KOs becomes reduced, thus leading to a more straightened curve. The graphs below show where, in a 100 player knockout, how the curve is adjusted after a round with 10 additional DNFs:
+Each round, the curve is recalculated to adjust for any inaccuracies. In the case of a mass KO, the curve adjusts itself because the remaining number of KOs becomes reduced, thus leading to a more straightened curve. The graphs below show how, in the same 40 player knockout, the curve is adjusted after a round with 4 additional DNFs (7 players knocked out):
 
-![KOs per round](img/example2-kos.png) ![Player count](img/example2-players.png)
+![Player count and KOs per round](img/dynamic-kos-example-unexpected-kos.png)
 
 The algorithm is also defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
 
