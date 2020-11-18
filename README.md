@@ -1,5 +1,5 @@
 # GeryKnockout
-Knockout plugin for the TMGery Trackmania Forever server controller.
+Knockout plugin for the TMGery server controller.
 
 ## About
 This repository contains a plugin for TMGery that enables knockout competitions to be held. Each round, the last players to finish, or those who don't finish, are knocked out until one player remains as the winner.
@@ -48,30 +48,32 @@ More detailed information can be found in the docs folder:
 - [User guide](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md)
 
 ## Reporting an issue
-If you encounter a bug or a plugin crash, create an issue here on GitHub. Try to supply the following information:
+If you encounter a bug or a plugin crash, [report it here](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose). Try to supply the following information:
 
 - What happened prior to the bug/crash
 - A snapshot using `/ko status` (if the plugin didn't crash)
 - The log in the console window (if you have access)
 
-An extra step in the debugging process is to set `MinimumLogLevel` to `Log::Debug` in `plugin.knockout.php` in order to get more information in the console window. Note that this may have a negative impact on the server performance.
+If you're able to, set `MinimumLogLevel` to `Log::Debug` in `plugin.knockout.php` in order to get more information in the console window. Note that this may have a negative impact on the server performance, so only do this temporarily.
+
+Have a suggestion? [Suggest it here](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose).
 
 ## Screenshots
-![Status bar](https://cdn.discordapp.com/attachments/770396713726509146/770607874531524628/unknown.png)
+<img src="docs/img/screenshot-1.png" alt="" style="max-height: 400px;">
 
-![Scoreboard](https://cdn.discordapp.com/attachments/770396713726509146/770607905744355328/unknown.png)
+<img src="docs/img/screenshot-2.png" alt="" style="max-height: 400px;">
 
-![Prompt when opting out of the knockout](https://cdn.discordapp.com/attachments/770396713726509146/771888724052934676/unknown.png)
+<img src="docs/img/screenshot-3.png" alt="" style="max-height: 160px;">
+
+## The team
+- [@Voyager006](https://github.com/Voyager006) - main plugin work, documentation
+- [@stefan-baumann](https://github.com/stefan-baumann) - dynamic KO multiplier algorithm, graphs
 
 ## Credits
-MrA for suggesting a progressive KO multiplier and [@stefan-baumann](https://github.com/stefan-baumann) for creating the algorithm
-
-Dennis for suggesting the syntax for the `/ko lives` command
-
-Realspace for suggesting the tiebreaker mode
-
-CavalierDeVache for the original plugin
-
-Mikey for the original concept (Madhouse Knockout)
-
-And everyone who joined the TMX Knockout server to help testing out the plugin!
+- MrA for suggesting a progressive KO multiplier
+- Dennis for suggesting the syntax for the `/ko lives` command
+- Realspace for suggesting the tiebreaker mode
+- CavalierDeVache for the original plugin
+- Mikey for the original concept (Madhouse Knockout)
+- All the hosters of the TMX Knockout for keeping it running throughout the years
+- And everyone who joined the TMX Knockout server to help testing out the plugin!
