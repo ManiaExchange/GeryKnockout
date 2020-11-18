@@ -120,7 +120,7 @@ Among these multipliers, Dynamic is without doubt the most advanced one, so let'
 
 First, a base curve `base_curve(r)` is defined. It defines the relative amount of additional KOs per round `r` over the baseline of 1 KO/round.
 
-![Base curve](img/dynamic-kos-base-curve.png)
+<img src="img/dynamic-kos-base-curve.png" height="320">
 
 Then, the goal is to find a discretized, scaled curve `c[r] = [a * base_curve(r)] + 1` such that the sum over `c[r]` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c[r]` until we find a value for `a` of which the sum of `c[r]` equals the total number of KOs.
 
