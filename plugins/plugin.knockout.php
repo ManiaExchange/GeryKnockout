@@ -3,8 +3,6 @@
  * Knockout plugin for Tm-Gery by Voyager006.
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
- *
- * November 16, 2020
  */
 
 const Version = '2.0.0 (beta)';
@@ -40,7 +38,8 @@ const MinimumLogLevel = Log::Debug;
  * - SetRoundCustomPoints
  * - SetRoundPointsLimit
  *
- * Has to be set before Synchronization in order to have effect on the upcoming round.
+ * Has to be set before onStatusChange (Synchronization) in order to have effect on the upcoming
+ * round.
  */
 
 
@@ -165,6 +164,10 @@ class KnockoutStatus
 
     /**
      * Returns true if the knockout has started.
+     *
+     * @param KnockoutStatus $status The current knockout status.
+     *
+     * @return bool True if the knockout has started, false otherwise.
      */
     public static function isInProgress($status)
     {
@@ -187,6 +190,10 @@ class PlayerStatus
 
     /**
      * Tests whether a player is currently in the knockout.
+     *
+     * @param PlayerStatus $status The status to test.
+     *
+     * @return bool True if the player is playing, false otherwise.
      */
     public static function isIn($status)
     {
@@ -196,6 +203,10 @@ class PlayerStatus
 
     /**
      * Tests whether a player is currently out of the knockout.
+     *
+     * @param PlayerStatus $status The status to test.
+     *
+     * @return bool True if the player is knocked out, false otherwise.
      */
     public static function isOut($status)
     {
@@ -205,6 +216,10 @@ class PlayerStatus
 
     /**
      * Tests whether a player is currently shelved.
+     *
+     * @param PlayerStatus $status The status to test.
+     *
+     * @return bool True if the player is shelved, false otherwise.
      */
     public static function isShelved($status)
     {
@@ -214,11 +229,42 @@ class PlayerStatus
 
     /**
      * Tests whether a player is disconnected (but still eligible to join).
+     *
+     * @param PlayerStatus $status The status to test.
+     *
+     * @return bool True if the player is disconnected (but still eligible to join), false
+     * otherwise.
      */
     public static function isDisconnected($status)
     {
         return $status === self::PlayingAndDisconnected
             || $status === self::ShelvedAndDisconnected;
+    }
+
+    /**
+     * Outputs a colored representation of a player status.
+     *
+     * @param PlayerStatus $status The status to output.
+     *
+     * @return string A string representation of the player status with a color code embedded.
+     */
+    public static function output($status)
+    {
+        switch ($status)
+        {
+            case self::Playing:
+                return '$0f0Playing';
+            case self::Shelved:
+                return '$08fShelved';
+            case self::KnockedOut:
+                return '$f00Knocked out';
+            case self::KnockedOutAndSpectating:
+                return '$808Spectating';
+            case self::OptingOut:
+                return '$808Opting out';
+            default:
+                return '';
+        }
     }
 }
 
@@ -424,7 +470,7 @@ class Chat
     private static function sendMessage($color, $message, $logins = null)
     {
         $formatted = sprintf('$ff0>> %s%s', $color, str_replace('$g', $color, $message));
-        if (is_null($logins) )
+        if (is_null($logins))
         {
             QueryManager::query('ChatSendServerMessage', $formatted);
         }
@@ -445,9 +491,9 @@ class Chat
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
      */
-    public static function announce($message, $logins = null)
+    public static function announce($message, $logins = null, $color = '$0f0')
     {
-        self::sendMessage('$0f0', $message, $logins);
+        self::sendMessage($color, $message, $logins);
     }
 
     /**
@@ -1373,6 +1419,47 @@ class UI
     }
 
     /**
+     * Shows a bigger info dialog with page count, arrows and an OK button.
+     *
+     * @param string $text The text to display. Must be manually broken into lines, otherwise, the
+     * text will extend beyond the become crammed.
+     * @param array $logins The player(s) to display the dialog for.
+     * @param int $currentPageNumber The current page number (1-based).
+     * @param int $totalPages The total number of pages.
+     * @param int $prevPageActionId [Optional] The action id that results in the previous page. If
+     * null, the button is greyed out.
+     * @param int $nextPageActionId [Optional] The action id that results in the next page. If null,
+     * the button is greyed out.
+     */
+    public static function showMultiPageDialog($text, $logins, $currentPageNumber, $totalPages, $prevPageActionId = null, $nextPageActionId = null)
+    {
+        $prevPage = is_null($prevPageActionId)
+            ? '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="StarGold" />'
+            : '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="ArrowPrev" action="' . $prevPageActionId . '" />';
+        $nextPage = is_null($nextPageActionId)
+            ? '<quad posn="5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="StarGold" />'
+            : '<quad posn="5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="ArrowNext" action="' . $nextPageActionId . '" />';
+        $manialink = '
+            <manialink id="440">
+                <format style="TextRaceChat" textsize="1.0" />
+                <frame posn="-40 43 1">
+                    <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1InRace" substyle="BgWindow3" />
+                    <label posn="0 0 1" sizen="80 3" halign="left" style="TextStaticSmall">' . $text . '</label>
+                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="99">Ok</label>
+                    <frame posn="72 -73 1">
+                        <quad posn="0 0 0" sizen="14 4" halign="center" valign="center" style="Bgs1" substyle="BgButton" />
+                        <label posn="-5 0.1 1" sizen="6 4" halign="left" valign="center">$o$444' . $currentPageNumber . '/' . $totalPages . '</label>
+                        ' . $prevPage . '
+                        ' . $nextPage . '
+                    </frame>
+                </frame>
+            </manialink>
+        ';
+        $commaSeparatedLogins = implode(',', $logins);
+        QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
+    }
+
+    /**
      * Shows a small, scalable prompt with two buttons, one for confirmation (Yes) and one for
      * cancellation (No).
      *
@@ -2035,20 +2122,60 @@ class KnockoutRuntime
             switch ($this->koStatus)
             {
                 case KnockoutStatus::Warmup:
-                    Chat::announce('Knockout $f80Warmup', $playersWithHudOff);
+                    Chat::announce('Knockout Warmup', $playersWithHudOff, '$f80');
+                    foreach ($playersWithHudOff as $login)
+                    {
+                        $player = $this->playerList->get($login);
+                        if ($player !== false)
+                        {
+                            Chat::info(
+                                sprintf('Status: %s', PlayerStatus::output($player['Status'])),
+                                array($login)
+                            );
+                        }
+                    }
                     break;
                 case KnockoutStatus::Tiebreaker:
-                    Chat::announce('Knockout $f00Tiebreaker', $playersWithHudOff);
+                    Chat::announce('Knockout Tiebreaker', $playersWithHudOff, '$f00');
                     break;
                 case KnockoutStatus::Running:
                     Chat::announce(sprintf('Knockout Round $fff%d', $this->roundNumber), $playersWithHudOff);
+                    Chat::info(
+                        sprintf(
+                            '$fff%d$g %s remaining, $fff%d$g %s this round',
+                            count($this->playerList->getPlaying()),
+                            count($this->playerList->getPlaying()) === 1 ? 'player' : 'players',
+                            $this->kosThisRound,
+                            $this->kosThisRound === 1 ? 'KO' : 'KOs'
+                        ),
+                        $playersWithHudOff
+                    );
+                    foreach ($playersWithHudOff as $login)
+                    {
+                        $player = $this->playerList->get($login);
+                        if ($player !== false)
+                        {
+                            Chat::info(
+                                sprintf('Status: %s', PlayerStatus::output($player['Status'])),
+                                array($login)
+                            );
+                        }
+                    }
+                    break;
+                case KnockoutStatus::RestartingRound:
+                case KnockoutStatus::RestartingTrack:
+                case KnockoutStatus::SkippingTrack:
+                case KnockoutStatus::SkippingWarmup:
+                case KnockoutStatus::Starting:
+                case KnockoutStatus::StartingNow:
+                case KnockoutStatus::Stopping:
                     break;
                 default:
                     Log::warning(sprintf(
                         'AnnounceRoundInChat: knockout is in unexpected mode %s',
                         getNameOfConstant($this->koStatus, 'KnockoutStatus')
                     ));
-                    return;
+                    break;
             }
         }
     }
@@ -4243,42 +4370,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $dark = '$g';
-                        $default = '$eee';
-                        $highlight = '$9f6';
-                        // $highlightFunc = function($str) use($default, $highlight)
-                        // {
-                        //     return sprintf('%s%s%s', $highlight, $str, $default);
-                        // };
-                        $commands = array(
-                            "/ko start {$dark}[now]{$default}",
-                            '/ko stop',
-                            "/ko skip {$dark}[warmup]{$default}",
-                            "/ko restart {$dark}[warmup]{$default}",
-                            "/ko add ({$highlight}<login>{$default} | *)",
-                            "/ko remove ({$highlight}<login>{$default} | *)",
-                            "/ko spec ({$highlight}<login>{$default} | *)",
-                            "/ko lives ({$highlight}<login>{$default} | *) {$dark}[[+ | -]{$highlight}<lives>{$dark}]{$default}",
-                            "/ko multi (constant {$highlight}<kos>{$default} | extra {$highlight}<per x players>{$default} | dynamic {$highlight}<total rounds>{$default} | none)",
-                            "/ko rounds {$highlight}<rounds>{$default}",
-                            '/ko openwarmup (on | off)',
-                            "/ko falsestart {$highlight}<max tries>{$default}",
-                            '/ko tiebreaker (on | off)',
-                            "/ko authorskip {$highlight}<for top x players>{$default}",
-                            '/ko status',
-                            '/ko help'
-                        );
-                        $content = implode(
-                            '',
-                            array_map(
-                                function($str) { return sprintf("\n        %s", $str); },
-                                $commands
-                            )
-                        );
-                        Chat::info2(
-                            sprintf('Synopsis: %s%s', $default, $content),
-                            array($issuerLogin)
-                        );
+                        $this->cliReference(1, array($issuerLogin));
                     }
                     break;
 
@@ -4286,6 +4378,127 @@ class KnockoutRuntime
                     $onError(sprintf('Syntax error: unexpected argument $fff%s$g (see $fff/ko help$g for usages)', $args[0]));
                     break;
             }
+        }
+    }
+
+    private function cliReference($pageNumber, $logins)
+    {
+        $sep1 = "\n\n";
+        $sep2 = "\n    ";
+        $var = '$i';
+        $endvar = '$i';
+        $totalPages = 3;
+
+        if ($pageNumber === 1)
+        {
+            $text = implode($sep1, array(
+                implode($sep2, array(
+                    "/ko start [now]",
+                    'Starts the knockout. If "now" is given, the current track will be skipped.'
+                )),
+
+                implode($sep2, array(
+                    "/ko stop",
+                    'Stops the knockout with immediate effect'
+                )),
+
+                implode($sep2, array(
+                    "/ko skip [warmup]",
+                    'Skips the current track. If "warmup" is given, only the warmup is skipped.'
+                )),
+
+                implode($sep2, array(
+                    "/ko restart [warmup]",
+                    'Restarts the current track, or the current round if in Rounds. If "warmup" is given, the track is',
+                    'restarted with a warmup'
+                )),
+
+                implode($sep2, array(
+                    "/ko add ({$var}login{$endvar} | *)",
+                    'Adds a player to the knockout. If the wildcard * is used, then everyone on the server is added.'
+                )),
+
+                implode($sep2, array(
+                    "/ko remove ({$var}login{$endvar} | *)",
+                    'Removes a player from the knockout, regardless of how many lives they have.'
+                )),
+
+                implode($sep2, array(
+                    "/ko spec ({$var}login{$endvar} | *)",
+                    'Same as /ko remove but instead puts the player into spectator status.'
+                )),
+
+                implode($sep2, array(
+                    "/ko lives ({$var}login{$endvar} | *) [[+ | -]{$var}lives{$endvar}]",
+                    'Displays or adjusts the number of lives to use for the knockout.'
+                ))
+            ));
+            UI::showMultiPageDialog(" \n\$s{$text}", $logins, 1, $totalPages, null, 462);
+        }
+        elseif ($pageNumber === 2)
+        {
+            $text = implode($sep1, array(
+                implode($sep2, array(
+                    "/ko multi (constant {$var}kos{$endvar} | extra {$var}per_x_players{$endvar} | dynamic {$var}total_rounds{$endvar} | none)",
+                    'Sets the KO multiplier mode.',
+                    '- Constant: x KOs per round',
+                    '- Extra: +1 KO for every x\'th player',
+                    '- Dynamic: Aims for a total of x rounds',
+                    '- None: 1 KO per round'
+                )),
+
+                implode($sep2, array(
+                    "/ko rounds {$var}rounds{$endvar}",
+                    'Sets the number of rounds per track to play in Rounds.'
+                )),
+
+                implode($sep2, array(
+                    "/ko openwarmup (on | off)",
+                    'Enables or disables open warmup which lets knocked out players play during warmup.'
+                )),
+
+                implode($sep2, array(
+                    "/ko falsestart {$var}max_tries{$endvar}",
+                    'Sets the limit for how many times the round will be restarted if someone retires before the countdown.'
+                )),
+
+                implode($sep2, array(
+                    "/ko tiebreaker (on | off)",
+                    'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and at not all of them would be knocked out.'
+                )),
+
+                implode($sep2, array(
+                    "/ko authorskip {$var}for_top_x_players{$endvar}",
+                    'Automatically skips a track when its author is present, once a given player count has been reached.'
+                )),
+
+                implode($sep2, array(
+                    "/ko settings",
+                    'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
+                ))
+            ));
+            UI::showMultiPageDialog(" \n\$s{$text}", $logins, 2, $totalPages, 461, 463);
+        }
+        elseif ($pageNumber === 3)
+        {
+            $text = implode($sep1, array(
+                implode($sep2, array(
+                    "/ko status",
+                    'Shows knockout mode, knockout status, player list and scores in a dialog window.'
+                )),
+
+                implode($sep2, array(
+                    "/ko help",
+                    'Shows the list of commands.'
+                )),
+
+                '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l'
+            ));
+            UI::showMultiPageDialog(" \n\$s{$text}", $logins, 3, $totalPages, 462, null);
+        }
+        else
+        {
+            Log::warning(sprintf('Tried to retrieve non-existing page $d of CLI reference', $pageNumber));
         }
     }
 
@@ -4306,7 +4519,7 @@ class KnockoutRuntime
         $text = implode("\n\n", array(
             implode("\n", array(
                 '$s',
-                '$oAbout the TM$f00X$g Knockout United\$o'
+                '$oAbout the TM$f00X$g Knockout United$o'
             )),
 
             implode("\n", array(
@@ -4342,7 +4555,7 @@ class KnockoutRuntime
             'The most important part is: never give up! Someone may have retired :)',
 
             implode("\n", array(
-                '$f00$l[http://bit.ly/TMXSpreadsheet]Results and map list$l',
+                '$4af$l[http://bit.ly/TMXSpreadsheet]Results and map list$l',
                 '$l[http://discordapp.com/invite/Ttkw54Y]TMX Discord$l'
             )),
         ));
@@ -4560,6 +4773,18 @@ class KnockoutRuntime
                 $this->onKoStatusUpdate();
                 Chat::info(sprintf('%s$z$s$g has opted out of the knockout', $playerObj['NickName']));
                 // Chat::info('You have opted out of the KO', array($login));
+                break;
+
+            case 461:
+                $this->cliReference(1, array($login));
+                break;
+
+            case 462:
+                $this->cliReference(2, array($login));
+                break;
+
+            case 463:
+                $this->cliReference(3, array($login));
                 break;
         }
     }
