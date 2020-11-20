@@ -1,0 +1,12 @@
+
+root = true
+
+[*]
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.{php}]
+charset = utf-8
+indent_size = 4

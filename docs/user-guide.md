@@ -8,7 +8,7 @@ The knockout is based on knocking out the slowest drivers each round. If there i
 
 If players do not finish (DNF), they will also be knocked out. This has the side effect that multiple players may be knocked out, even if there is only supposed to be 1 KO per round.
 
-This continues until there is one player remaining. This player is the only one who has not been knocked out and is therefore crowned as the winner.
+This is then repeated until there is one player remaining. This player is the only one who has not been knocked out and is therefore crowned as the winner.
 
 Supported game modes include Rounds, Time Attack and Stunts. Laps, Cup and Team are currently not supported.
 
@@ -36,7 +36,7 @@ To start the knockout, use [/ko start](https://github.com/ManiaExchange/GeryKnoc
 
 When starting the knockout, all players are put to play. If someone doesn't want to play, let them know about [opting out](#opting-out).
 
-During the knockout, the following commands may be used for moderation:
+During the knockout, the following commands may be used:
 
 - [/ko skip [warmup]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-skip-warmup) - skips the current warmup or track
 - [/ko restart [warmup]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-restart-warmup) - restarts the current round or track
@@ -61,7 +61,7 @@ These settings are displayed when starting the knockout, but you can use `/ko se
 
 A full overview of the commands is listed in [cli.md](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md).
 
-## Configuration
+## Features
 
 ### Allow knocked out players to play during warmup
 Players who have been knocked out are able to play during warmups if `/ko openwarmup` is enabled. This does not apply to spectators; if a player wants to be spectating instead, they can enter spectator mode during a warmup or a podium. Same thing applies the other way; if a spectator wants to play during warmups, leave spectator mode during a warmup or a podium. This also applies to shelved players during tiebreakers.
@@ -120,17 +120,17 @@ Among these multipliers, Dynamic is without doubt the most advanced one, so let'
 
 First, a base curve `base_curve(r)` is defined. It defines the relative amount of additional KOs per round `r` over the baseline of 1 KO/round.
 
-<img src="img/dynamic-kos-base-curve.png" style="max-height: 320px;">
+![A graph of the base curve](img/dynamic-kos-base-curve-320p.png)
 
 Then, the goal is to find a discretized, scaled curve `c[r] = [a * base_curve(r)] + 1` such that the sum over `c[r]` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c[r]` until we find a value for `a` of which the sum of `c[r]` equals the total number of KOs.
 
 With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and overall player count will look like the following:
 
-![Player count and KOs per round](img/dynamic-kos-example-normal.png)
+![Graphs showing player count and KOs per round with no unexpected KOs](img/dynamic-kos-example-normal-320p.png)
 
 Each round, the curve is recalculated to adjust for any inaccuracies. In the case of a mass KO, the curve adjusts itself because the remaining number of KOs becomes reduced, thus leading to a more straightened curve. The graphs below show how, in the same 40 player knockout, the curve is adjusted after a round with 4 additional DNFs (7 players knocked out):
 
-![Player count and KOs per round](img/dynamic-kos-example-unexpected-kos.png)
+![Graphs showing player count and KOs per round with unexpected KOs](img/dynamic-kos-example-unexpected-kos-320p.png)
 
 The algorithm is also defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
 
@@ -144,7 +144,7 @@ When a player gets last, they will lose a life. If it was their last life, they 
 The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). The number of lives may be relative (by using a + or - sign in front of the number) or absolute.
 
 ### Rounds per track
-In Rounds, the number of rounds is enforced by using [/ko rounds *rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-rounds-rounds). The default is 1, which means 1 round will be played on each track.
+In Rounds, the number of rounds to be played per track is enforced by using [/ko rounds *rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-rounds-rounds). The default is 1, which means 1 round will be played on each track.
 
 In order to do this, the plugin enforces a custom points partition. Every surviving player is given 1 point, and knocked out players are given 0. The points limit can therefore be used to determine the number of rounds per track. This overrides the server's current points partition.
 
@@ -161,23 +161,23 @@ The plugin includes a status bar showing knockout status and player status, and 
 
 The status bar can be disabled by clicking the TMGery button on the top left - in that case, the information will be shown in chat instead. The status bar may display the following states throughout a knockout:
 
-| Knockout status | Description |
-| :-- | :-- |
-| `Warmup` | Warmup phase. No KOs are performed. |
-| `Skipping warmup` | Warmup phase is being skipped by using `/ko skip warmup`. No KOs are performed. |
-| `Running` | Knockout is live. Displays "Round x". KOs are performed at the end of the round unless no one finishes. |
-| `Restarting round` | Round is being restarted by using `/ko restart`. No KOs are performed. |
-| `Restarting track` | Track is being restarted by using `/ko restart warmup`. No KOs are performed. |
-| `Skipping track` | Track is being skipped by using `/ko skip`. No KOs are performed. |
-| `Tiebreaker` | Tiebreaker mode among tied players. Non-participating players are put to player status `Shelved`. |
+Knockout status    | Description
+:--------------    | :----------
+`Warmup`           | Warmup phase. No KOs are performed.
+`Skipping warmup`  | Warmup phase is being skipped by using `/ko skip warmup`. No KOs are performed.
+`Running`          | Knockout is live. Displays "Round x". KOs are performed at the end of the round unless no one finishes.
+`Restarting round` | Round is being restarted by using `/ko restart`. No KOs are performed.
+`Restarting track` | Track is being restarted by using `/ko restart warmup`. No KOs are performed.
+`Skipping track`   | Track is being skipped by using `/ko skip`. No KOs are performed.
+`Tiebreaker`       | Tiebreaker mode among tied players. Non-participating players are put to player status `Shelved`.
 
-| Player status | Description |
-| :-- | :-- |
-| `Playing` | Participating in the knockout. |
-| `Knocked out` | Out of the knockout, but can play during warmups. |
-| `Spectating` | Out of the knockout, and won't be playing during warmups. |
-| `Shelved` | Temporarily put aside for a tiebreaker. Once the tiebreaker is over, shelved players will be playing again. |
-| `Opting out` | In the process of opting out of the knockout, but can still rejoin using `/opt in`. |
+Player status | Description
+:------------ | :----------
+`Playing`     | Participating in the knockout.
+`Knocked out` | Out of the knockout, but can play during warmups.
+`Spectating`  | Out of the knockout, and won't be playing during warmups.
+`Shelved`     | Temporarily put aside for a tiebreaker. Once the tiebreaker is over, shelved players will be playing again.
+`Opting out`  | In the process of opting out of the knockout, but can still rejoin using `/opt in`.
 
 Note: this list is not exhaustive - there are some additional states that are not displayed in the status bar.
 
@@ -187,15 +187,15 @@ The scoreboard is shown when someone have finished or DNFs in Rounds, and always
 
 The colors in the scoreboard represent the following:
 
-| Color | Description |
-| :-- | :-- |
-| 🟩 | Safe from getting knocked out. Always shown for 1st place. |
-| 🟨 | 2 places from being knocked out. |
-| 🟧 | 1 place from being knocked out. |
-| 🟥 | In danger of being knocked out. |
+Color | Description
+:---- | :----------
+🟩     | Safe from getting knocked out. Always shown for 1st place.
+🟨     | 2 places from being knocked out.
+🟧     | 1 place from being knocked out.
+🟥     | In danger of being knocked out.
 
 ## Opting out
-A player may choose to opt out of the knockout using `/opt out`. Doing so in the middle of a live round will make them retire and DNF, regardless of whether they finished or not. Otherwise, they may still change their mind using `/opt in`, as long as they do so by the time the next live round starts.
+A player may choose to opt out of the knockout using [/opt out](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#opt-out). Doing so in the middle of a live round will make them retire and DNF, regardless of whether they finished or not. Otherwise, they may still change their mind using [/opt in](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#opt-in), as long as they do so by the time the next live round starts.
 
 A confirmation window will appear when opting out to ensure that the player opts out only if they really want to.
 
@@ -214,38 +214,40 @@ Secondly, there are also some changes concerning the CLI:
 
 Updated admin commands:
 
-- `/kostart` -> `/ko start [now]`
-- `/kostop` -> `/ko stop`
-- `/konextmap` -> `/ko skip [warmup]`
-- `/korestartmap` -> `/ko restart [warmup]`
-- `/koadd <login>`, `/koaddall` -> `/ko add (<login> | *)`
-- `/koremove <login>`, `/koremoveall` -> `/ko remove (<login> | *)`
-- `/komulti <per_x_players>`, `/komulti ko <kos>` -> `/ko multi (constant <kos> | extra <per_x_players> | dynamic <total_rounds> | none)`
+Old syntax   | New syntax
+:----------- | :-----------
+/kostart   | /ko start [now]
+/kostop    | /ko stop
+/konextmap | /ko skip [warmup]
+/korestartmap | /ko restart [warmup]
+/koadd *login* </br> /koaddall | /ko add *login* </br> /ko add \*
+/koremove *login* </br> /koremoveall | /ko remove *login* </br> /ko remove \*
+/komulti *per_x_players* </br> /komulti ko *kos* | /ko multi constant *kos* </br> /ko multi extra *per_x_players* </br> /ko multi dynamic *total_rounds* </br> /ko multi none
 
 New admin commands:
 
-- `/ko spec (<login> | *)`
-- `/ko lives (<login> | *) [[+ | -]<lives>]` (default: 1)
-- `/ko rounds <rounds>` (default: 1)
-- `/ko openwarmup (on | off)` (default: on)
-- `/ko falsestart <max tries>` (default 2, 0 to disable)
-- `/ko tiebreaker (on | off)` (default: on)
-- `/ko authorskip <for top x players>` (default: 7, 0 to disable)
-- `/ko settings`
-- `/ko status`
-- `/ko help`
+- /ko spec (*login* | \*)
+- /ko lives (*login* | \*) [[+ | -]*lives*]
+- /ko rounds *rounds*
+- /ko openwarmup (on | off)
+- /ko falsestart *max_tries*
+- /ko tiebreaker (on | off)
+- /ko authorskip *for_top_x_players*
+- /ko settings
+- /ko status
+- /ko help
 
 New public commands:
 
-- `/info`
-- `/opt in`
-- `/opt out`
+- /info
+- /opt in
+- /opt out
 
 Removed commands:
 
-- `/kogetpass`
-- `/kosetpass <password>`
-- `/koJOIN <password>`
+- /kogetpass
+- /kosetpass *password*
+- /koJOIN *password*
 
 Because version 2.0.0 has significant changes to internal structure, `/ForcePlay [<login>]` and `/ForcePlayAll` does not put players into the knockout any longer. Use `/ko add <login>` and `/ko add *` instead. You may use `/ForceSpec [<login>]`, but `/ko remove <login>` is recommended as it has immediate effect.
 

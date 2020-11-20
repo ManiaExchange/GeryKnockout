@@ -3,7 +3,7 @@
  * Knockout plugin for Tm-Gery by Voyager006.
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
- * 
+ *
  * November 16, 2020
  */
 
@@ -76,9 +76,9 @@ function getNameOfConstant($value, $className)
 
 /**
  * Returns the sign of the given number.
- * 
+ *
  * @param int|float $number The number to evaluate.
- * 
+ *
  * @return int -1 if the number is negative, 1 if it is positive, 0 otherwise.
  */
 function sign($number)
@@ -92,10 +92,10 @@ function sign($number)
 if (!function_exists('str_contains')) {
     /**
      * Checks if a string is contained in another string.
-     * 
+     *
      * @param string $haystack The string to search in.
      * @param string $needle The string to search for.
-     * 
+     *
      * @return bool True if the string was found, false otherwise.
      */
     function str_contains($haystack, $needle)
@@ -168,7 +168,7 @@ class KnockoutStatus
      */
     public static function isInProgress($status)
     {
-        return $status !== self::Idle 
+        return $status !== self::Idle
             && $status !== self::Starting
             && $status !== self::StartingNow;
     }
@@ -193,7 +193,7 @@ class PlayerStatus
         return $status === self::Playing
             || $status === self::PlayingAndDisconnected;
     }
-    
+
     /**
      * Tests whether a player is currently out of the knockout.
      */
@@ -282,16 +282,16 @@ class Log
 
 /**
  * Utility class for client queries.
- * 
+ *
  * Use this class as an instance for multicalling:
- * 
+ *
  *     $queries = new QueryManager();
  *     $queries->add('ChatSendServerMessage', 'Hello world');
  *     $queries->add('ChatSendServerMessage', 'It's nice to be here');
  *     $queries->submit();
- * 
+ *
  * or use its static methods for single queries:
- * 
+ *
  *     QueryManager::query('ForceSpectator', 'voyager006', 0);
  *     $response = QueryManager::queryWithResponse('GetPlayerInfo', 'voyager006');
  */
@@ -319,7 +319,7 @@ class QueryManager
 
     /**
      * Adds a client query to memory.
-     * 
+     *
      * @param string $methodName The method name of the query.
      * @param mixed $arg1 [Optional] The first argument for the specified query.
      * @param mixed $arg2 [Optional] The second argument for the specified query.
@@ -333,7 +333,7 @@ class QueryManager
             function($arg) { return !is_null($arg); }
         );
         $this->multicall[] = array(
-            'methodName' => $methodName, 
+            'methodName' => $methodName,
             'params' => $args
         );
     }
@@ -358,13 +358,13 @@ class QueryManager
 
     /**
      * Queries the client.
-     * 
+     *
      * @param string $methodName The method name of the query.
      * @param mixed $arg1 [Optional] The first argument for the specified query.
      * @param mixed $arg2 [Optional] The second argument for the specified query.
      * @param mixed $arg3 [Optional] The third argument for the specified query.
      * @param mixed $arg4 [Optional] The fourth argument for the specified query.
-     * 
+     *
      * @return bool True if the query was successfully handled, false if an error occurred.
      */
     public static function query($methodName, $arg1 = null, $arg2 = null, $arg3 = null, $arg4 = null)
@@ -595,7 +595,7 @@ class Scores
     {
         Log::debug("submitScore {$login} {$score}");
         $logins = array_map(
-            function($score) { return $score['Login']; }, 
+            function($score) { return $score['Login']; },
             $this->scores
         );
         $index = array_search($login, $logins, true);
@@ -640,9 +640,9 @@ class Scores
 
     /**
      * Gets the current best time (in milliseconds) or score of a given player.
-     * 
+     *
      * @param string $login The login of the player.
-     * 
+     *
      * @return int|bool The score if the player has set one, or false if no score has been set.
      */
     public function get($login)
@@ -776,7 +776,7 @@ class PlayerList
 
     /**
      * Gets a player object by their login.
-     * 
+     *
      * @param string $login The login of the player.
      * @return mixed[] The player object if found, null otherwise.
      */
@@ -792,12 +792,12 @@ class PlayerList
             return null;
         }
     }
-    
+
     /**
      * Tests whether a given player is in this player list.
-     * 
+     *
      * @param string $login The login of the player.
-     * 
+     *
      * @return bool True if the login exists in this player list, false otherwise.
      */
     public function exists($login)
@@ -807,10 +807,10 @@ class PlayerList
 
     /**
      * Returns true if a player has the given status.
-     * 
+     *
      * @param string $login The login of the player.
      * @param PlayerStatus $status The status to search for.
-     * 
+     *
      * @return bool True if the player has the given status, false otherwise.
      */
     public function hasStatus($login, $status)
@@ -820,7 +820,7 @@ class PlayerList
 
     /**
      * Gets all players in this list.
-     * 
+     *
      * @return mixed[] An array of all player objects.
      */
     public function getAll()
@@ -830,7 +830,7 @@ class PlayerList
 
     /**
      * Filters this list by the given player status.
-     * 
+     *
      * @param PlayerStatus $playerStatus The player status to be met.
      * @return mixed[] An array of players with the specific player status.
      */
@@ -849,7 +849,7 @@ class PlayerList
 
     /**
      * Performs a callback function for each element in the player list.
-     * 
+     *
      * @param callback $mapping The callback function to perform on each player in the list.
      */
     public function map($mapping)
@@ -859,7 +859,7 @@ class PlayerList
 
     /**
      * Removes a player from this player list. Note: this is not equivalent to performing a KO.
-     * 
+     *
      * @param string $login The login of the player.
      */
     public function remove($login)
@@ -884,7 +884,7 @@ class PlayerList
 
     /**
      * Updates the nickname of the given player.
-     * 
+     *
      * @param string $login The login of the player.
      * @param string $nickname The updated nickname.
      */
@@ -902,7 +902,7 @@ class PlayerList
 
     /**
      * Sets the number of lives for the given player.
-     * 
+     *
      * @param string $login The login of the player.
      * @param int $numberOfLives The desired number of lives.
      */
@@ -920,7 +920,7 @@ class PlayerList
 
     /**
      * Sets the status of the specified player.
-     * 
+     *
      * @param string $login The login of the player.
      * @param PlayerStatus $playerStatus The new status of the player.
      */
@@ -938,7 +938,7 @@ class PlayerList
 
     /**
      * Transitions all players of the given player status into another player status.
-     * 
+     *
      * @param string $login The login of the player.
      * @param PlayerStatus $playerStatus The status of the player.
      */
@@ -957,7 +957,7 @@ class PlayerList
      * @param string $login The login of the player who should receive a life.
      * @param bool $isTiebreaker Whether there is a tiebreaker running or not. If there is, the
      * player will be shelved instead of playing.
-     * 
+     *
      * @return bool True if the player has been reinstated, false otherwise.
      */
     // public function addLife($login)
@@ -985,9 +985,9 @@ class PlayerList
 
     /**
      * Subtracts a life from the given player at the end of a round.
-     * 
+     *
      * @param string $login The login of the player who should lose a life.
-     * 
+     *
      * @return bool True if the player lost their last life, false otherwise.
      */
     public function subtractLife($login)
@@ -1020,7 +1020,7 @@ class PlayerList
     public function getPlaying()
     {
         return array_filter(
-            $this->players, 
+            $this->players,
             function($player) { return PlayerStatus::isIn($player['Status']); }
         );
     }
@@ -1031,7 +1031,7 @@ class PlayerList
     public function getPlayingOrShelved()
     {
         return array_filter(
-            $this->players, 
+            $this->players,
             function($player) { return PlayerStatus::isIn($player['Status']) || PlayerStatus::isShelved($player['Status']); }
         );
     }
@@ -1054,7 +1054,7 @@ class UI
     private static function statusBarManialink($playerStatus, $knockoutStatus, $roundNumber, $numberOfPlayers, $numberOfKOs)
     {
         Log::debug(sprintf('statusBarManialink %d %d %d %d %d', $playerStatus, $knockoutStatus, $roundNumber, $numberOfPlayers, $numberOfKOs));
-        
+
         $colors = array(
             KnockoutStatus::Warmup => 'f808',
             KnockoutStatus::Running => 'eee8',
@@ -1260,7 +1260,7 @@ class UI
                 <scoretable visible="true"/>
                 <global visible="true"/>
             </custom_ui>
-        ';     
+        ';
     }
 
     /**
@@ -1457,10 +1457,10 @@ class KOMultiplier
 
     /**
      * Gets the number of KOs to perform in this round.
-     * 
+     *
      * @param int $roundNumber The current round number.
      * @param int $numberOfPlayersLeft The number of players left in the KO.
-     * 
+     *
      * @return int The number of KOs to be applied this round.
      */
     public function getKOsThisRound($roundNumber, $numberOfPlayersLeft)
@@ -1503,9 +1503,9 @@ class KOMultiplier
 
     /**
      * Sine function of KOs per round minus 1.
-     * 
+     *
      * @link https://colab.research.google.com/drive/1QO312KzpRUfsSWfQjfpW3bC9hxxcr29v?usp=sharing
-     * 
+     *
      * @author Solux
      */
     private function baseCurve()
@@ -1527,9 +1527,9 @@ class KOMultiplier
     /**
      * Returns the scaled curve + 1 -> the amount of kos per round for the
      * scaling factor f.
-     * 
+     *
      * @link https://colab.research.google.com/drive/1QO312KzpRUfsSWfQjfpW3bC9hxxcr29v?usp=sharing
-     * 
+     *
      * @author Solux
      */
     private function getNonDiscretizedScaledCurve($baseCurve, $f)
@@ -1543,9 +1543,9 @@ class KOMultiplier
     /**
      * Returns the scaled curve + 1 -> the amount of kos per round for the
      * scaling factor f, rounded to the nearest integer.
-     * 
+     *
      * @link https://colab.research.google.com/drive/1QO312KzpRUfsSWfQjfpW3bC9hxxcr29v?usp=sharing
-     * 
+     *
      * @author Solux
      */
     private function getScaledCurve($baseCurve, $f)
@@ -1564,9 +1564,9 @@ class KOMultiplier
      * Optimized version of the solving algorithm that accounts for cases that
      * cannot be solved in discrete space and readjusts the curve by 1 ko for a
      * single round if needed.
-     * 
+     *
      * @link https://colab.research.google.com/drive/1QO312KzpRUfsSWfQjfpW3bC9hxxcr29v?usp=sharing
-     * 
+     *
      * @author Solux
      */
     private function solveCurve($curve, $currentRound, $totalRounds, $playersLeft, $playersToRemainAfterEnd)
@@ -1692,7 +1692,7 @@ class KOMultiplier
 
 /**
  * Tests if the given player has Tm-Gery HUD enabled.
- * 
+ *
  * @param string $login The login of the player.
  * @return bool True if HUD is shown for the player.
  */
@@ -1714,7 +1714,7 @@ function hasHudOn($login)
 
 /**
  * Tests if the given player has Tm-Gery HUD disabled.
- * 
+ *
  * @param string $login The login of the player.
  * @return bool True if HUD is not shown for the player.
  */
@@ -1749,8 +1749,8 @@ function forcePlay($logins, $force)
     if (count($logins) > 0)
     {
         Log::debug(sprintf(
-            'Forcing the following players into play (%s): %s', 
-            $force ? 'ForcePlay' : 'UserSelectable', 
+            'Forcing the following players into play (%s): %s',
+            $force ? 'ForcePlay' : 'UserSelectable',
             print_r($logins, true)
         ));
         $queries = new QueryManager();
@@ -1783,8 +1783,8 @@ function forceSpec($logins, $force)
     if (count($logins) > 0)
     {
         Log::debug(sprintf(
-            'Forcing the following players into spec (%s): %s', 
-            $force ? 'ForceSpec' : 'UserSelectable', 
+            'Forcing the following players into spec (%s): %s',
+            $force ? 'ForceSpec' : 'UserSelectable',
             print_r($logins, true)
         ));
         $queries = new QueryManager();
@@ -1804,15 +1804,15 @@ function forceSpec($logins, $force)
 
 /**
  * Returns the logins of a player array.
- * 
+ *
  * @param array $players An array of player structs, each containing a field 'Login'.
- * 
+ *
  * @return array An array of the logins of the players.
  */
 function logins($players)
 {
     return array_map(
-        function($player) { return $player['Login']; }, 
+        function($player) { return $player['Login']; },
         $players
     );
 }
@@ -1823,7 +1823,7 @@ function logins($players)
  *
  * @param array $player An SPlayerInfo struct of the given player, received from a callback or
  * retrieved using 'GetPlayerInfo' or 'GetDetailedPlayerInfo'.
- * 
+ *
  * @return bool True if the player object is configured to be spectating, false otherwise.
  */
 function isSpectator($player)
@@ -1846,7 +1846,7 @@ function isSpectator($player)
  *
  * @param array $player An SPlayerInfo struct of the given player, received from a callback or
  * retrieved using 'GetDetailedPlayerInfo'.
- * 
+ *
  * @return bool True if the player is not able to enter/exit spectator mode, false otherwise.
  */
 function isForced($player)
@@ -2045,7 +2045,7 @@ class KnockoutRuntime
                     break;
                 default:
                     Log::warning(sprintf(
-                        'AnnounceRoundInChat: knockout is in unexpected mode %s', 
+                        'AnnounceRoundInChat: knockout is in unexpected mode %s',
                         getNameOfConstant($this->koStatus, 'KnockoutStatus')
                     ));
                     return;
@@ -2064,7 +2064,7 @@ class KnockoutRuntime
 
             case GameMode::Laps:
             case GameMode::Rounds:
-            case GameMode::TimeAttack:            
+            case GameMode::TimeAttack:
                 $this->scores->setSortingOrder(true);
                 break;
         }
@@ -2072,7 +2072,7 @@ class KnockoutRuntime
 
     /**
      * Starts the knockout.
-     * 
+     *
      * @param array $players  Players to start with (result of GetPlayerList query)
      * @param bool $now       True to skip the current track and start the KO immediately.
      */
@@ -2388,7 +2388,7 @@ class KnockoutRuntime
                 Log::debug(sprintf('rec3 %d %d', $i, $j));
                 // Return tied players
                 $tiedPlayers = array_map(
-                    function($score) { return $score['Login']; }, 
+                    function($score) { return $score['Login']; },
                     array_slice($scores, $j + 1, $i - $j, true)
                 );
                 return array(
@@ -2470,7 +2470,7 @@ class KnockoutRuntime
 
     /**
      * Starts a tiebreaker.
-     * 
+     *
      * @param array $tiedPlayers Logins of tied players.
      * @param int $kosRemaining The number of KOs to be performed in the tiebreaker.
      */
@@ -2701,7 +2701,7 @@ class KnockoutRuntime
     public function onStatusChange($args)
     {
         Log::debug(sprintf('onStatusChange %s', implode(' ', $args)));
-        
+
         switch ($args[0])
         {
             case ServerStatus::Launching:
@@ -2740,9 +2740,9 @@ class KnockoutRuntime
         }
     }
 
-    /** 
+    /**
      * Callback method for when a race starts.
-     * 
+     *
      * This method is called when a track is loaded.
      *
      * @param array $args An array passed by the server.
@@ -2793,7 +2793,7 @@ class KnockoutRuntime
         }
     }
 
-    /** 
+    /**
      * Callback method for when a round starts, after the synchronization phase.
      */
     public function onBeginRound()
@@ -2832,12 +2832,12 @@ class KnockoutRuntime
 
     /**
      * Returns true if an unregistered player is eligible to join the KO.
-     * 
+     *
      * Cases where a player can join a KO while it's running include:
      * - The knockout is about to start, but has not started yet
      * - The knockout is in its first warmup
      * - The knockout is in its first round (for Time Attack and Stunts)
-     * 
+     *
      * @return bool True if the player is eligible to be forced to play.
      */
     private function isEligibleToJoin() {
@@ -2862,11 +2862,11 @@ class KnockoutRuntime
         }
     }
 
-    /** 
+    /**
      * Callback method for when a player joins the server.
-     * 
+     *
      * @param array $args An array passed by the server.
-     * 
+     *
      *     $args = [
      *         [0] => (string) The login of the player.
      *         [1] => (bool)   True if the player joins as a spectator.
@@ -2934,9 +2934,9 @@ class KnockoutRuntime
 
     /**
      * Callback method for when a player leaves the server.
-     * 
+     *
      * @param array $args An array passed by the server.
-     * 
+     *
      *     $args = [
      *         [0] => (string) The login of the player.
      *     ]
@@ -2945,7 +2945,7 @@ class KnockoutRuntime
     {
         Log::debug(sprintf('onPlayerDisconnect %s', implode(' ', $args)));
         if ($this->koStatus === KnockoutStatus::Idle) return;
-        
+
         $login = $args[0];
         $player = $this->playerList->get($login);
         switch ($player['Status'])
@@ -2973,10 +2973,10 @@ class KnockoutRuntime
      *     $args = [
      *         [0] => (int)    The UID of the player.
      *         [1] => (string) The login of the player.
-     *         [2] => (int)    The time (in milliseconds) or score (in 
+     *         [2] => (int)    The time (in milliseconds) or score (in
      *                         points) performed by the player.
      *         [3] => (int)    The current lap number.
-     *         [4] => (int)    The current checkpoint index. 
+     *         [4] => (int)    The current checkpoint index.
      *     ]
      */
     public function onPlayerCheckpoint($args)
@@ -2984,25 +2984,25 @@ class KnockoutRuntime
         Log::debug(sprintf('onPlayerCheckpoint %s', implode(' ', $args)));
     }
 
-    /** 
+    /**
      * Callback method for when someone retires or finishes a round.
-     * 
+     *
      * Ends the current round if a player retires before the countdown in Rounds.
-     * 
+     *
      * @param array $args An array passed by the server.
-     * 
+     *
      *     $args = [
      *         [0] => (int)    The UID of the player.
      *         [1] => (string) The login of the player.
-     *         [2] => (int)    The time (in milliseconds) or score (in 
-     *                         points) performed by the player. If the player has 
+     *         [2] => (int)    The time (in milliseconds) or score (in
+     *                         points) performed by the player. If the player has
      *                         retired without finishing, a value of 0 is given.
      *     ]
      */
     public function onPlayerFinish($args)
     {
         Log::debug(sprintf('onPlayerFinish %s', implode(' ', $args)));
-        
+
         $login = $args[1];
         $timeOrScore = $args[2];
 
@@ -3042,7 +3042,7 @@ class KnockoutRuntime
                 {
                     $this->shouldCheckForFalseStarts = false;
                 }
-                
+
                 if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
                 {
                     $playerObj = $this->playerList->get($login);
@@ -3085,11 +3085,11 @@ class KnockoutRuntime
 
     /**
      * Callback method for when a player's info changes.
-     * 
+     *
      * This function is called when a player's info changes, such as spectator status.
-     * 
+     *
      * @param array $params An array passed by the server.
-     * 
+     *
      *     $args = [
      *         [0] => (SPlayerInfo) The updated player object.
      *     ]
@@ -3113,7 +3113,7 @@ class KnockoutRuntime
                         $this->updateStatusBar($login);
                     }
                     break;
-    
+
                 case PlayerStatus::KnockedOutAndSpectating:
                     if (!isForced($args[0]) && !isSpectator($args[0]))
                     {
@@ -3121,10 +3121,10 @@ class KnockoutRuntime
                         $this->updateStatusBar($login);
                     }
                     break;
-    
+
                 case PlayerStatus::Shelved:
                     break;
-    
+
                 default:
                     if (isSpectator($args[0]))
                     {
@@ -3256,18 +3256,18 @@ class KnockoutRuntime
         }
     }
 
-    /** 
+    /**
      * Callback method for when a race ends.
-     * 
+     *
      * This function is called
-     * 
+     *
      * - when the warump ends
      * - when restarting the match
      * - when skipping to the next track
      * - when normally proceeding to the next track
-     * 
+     *
      * @param array $args An array passed by the server.
-     * 
+     *
      *     $args = [
      *         [0] => (SPlayerRanking[]) The final rankings.
      *         [1] => (SChallengeInfo) The current challenge.
@@ -3407,12 +3407,12 @@ class KnockoutRuntime
 
     /**
      * CLI for interacting with the knockout system.
-     * 
+     *
      * This function is called when a user sends a chat message starting with '/ko'.
-     * 
+     *
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
-     * 
+     *
      *     $issuer = [
      *         [0] => (string) The login of the player who issued the command.
      *         [1] => (string) The nickname of the player who issued the command.
@@ -3486,7 +3486,7 @@ class KnockoutRuntime
                         //     $onError('Knockout requires multiple players');
                         //     return;
                         // }
-                        
+
                         $this->start($players, $args[1] === 'now');
                         Chat::info2('Knockout starting with the following settings:', array($issuerLogin));
                         Chat::info2($this->printSettings(), array($issuerLogin));
@@ -3564,7 +3564,7 @@ class KnockoutRuntime
                         $onError(sprintf('Unexpected argument $fff%s$g (expected $fff/ko skip$g or $fff/ko skip warmup$g)', $args[1]));
                     }
                     break;
-    
+
                 // /ko restart [warmup]
                 case 'restart':
                     if ($this->koStatus === KnockoutStatus::Idle)
@@ -3611,7 +3611,7 @@ class KnockoutRuntime
                         $onError(sprintf('Syntax error: unexpected argument $fff%s$g (expected $fff/ko restart$g or $fff/ko restart warmup$g)', $args[1]));
                     }
                     break;
-    
+
                 // /ko add (<login> | *)
                 case 'add':
                     if ($this->koStatus === KnockoutStatus::Idle)
@@ -3642,9 +3642,9 @@ class KnockoutRuntime
                             $onError(sprintf('Error: login $fff%s$g could not be found', $args[1]));
                             return;
                         }
-                        
+
                         $playersToAdd = array_filter(
-                            $playersToAdd, 
+                            $playersToAdd,
                             function($player) { return !PlayerStatus::isIn($player['Status']); }
                         );
                         if (count($playersToAdd) === 0)
@@ -3672,7 +3672,7 @@ class KnockoutRuntime
                         }
                     }
                     break;
-    
+
                 // /ko remove (<login> | *)
                 // /ko spec (<login> | *)
                 case 'remove':
@@ -3709,7 +3709,7 @@ class KnockoutRuntime
                         if ($args[0] === 'remove')
                         {
                             $playersToRemove = array_filter(
-                                $playersToRemove, 
+                                $playersToRemove,
                                 function($player) { return $player['Status'] !== PlayerStatus::KnockedOut; }
                             );
                             if (count($playersToRemove) === 0)
@@ -3739,7 +3739,7 @@ class KnockoutRuntime
                         else
                         {
                             $playersToRemove = array_filter(
-                                $playersToRemove, 
+                                $playersToRemove,
                                 function($player) { return $player['Status'] !== PlayerStatus::KnockedOutAndSpectating; }
                             );
                             if (count($playersToRemove) === 0)
@@ -3800,7 +3800,7 @@ class KnockoutRuntime
                             $onError(sprintf('Error: login $fff%s$g could not be found', $args[1]));
                             return;
                         }
-                        
+
                         if (is_null($args[2]))
                         {
                             // Display
@@ -3880,7 +3880,7 @@ class KnockoutRuntime
                         }
                     }
                     break;
-    
+
                 // /ko multi (constant <kos> | extra <per_x_players> | dynamic <total_rounds> | none)
                 case 'multi':
                     if ($this->koStatus === KnockoutStatus::Tiebreaker)
@@ -4016,7 +4016,7 @@ class KnockoutRuntime
                         }
                     }
                     break;
-    
+
                 // /ko rounds <rounds>
                 case 'rounds':
                     if (is_null($args[1]))
@@ -4056,7 +4056,7 @@ class KnockoutRuntime
                         }
                     }
                     break;
-    
+
                 // /ko openwarmup (on | off)
                 case 'openwarmup':
                     if (is_null($args[1]))
@@ -4084,7 +4084,7 @@ class KnockoutRuntime
                         $onError(sprintf('Error: unexpected argument $fff%s$g (expected $fffon$g or $fffoff$g)', $args[1]));
                     }
                     break;
-    
+
                 // /ko falsestart <max_tries>
                 case 'falsestart':
                     if (is_null($args[1]))
@@ -4121,7 +4121,7 @@ class KnockoutRuntime
                         }
                     }
                     break;
-    
+
                 // /ko tiebreaker (on | off)
                 case 'tiebreaker':
                     if (is_null($args[1]))
@@ -4147,7 +4147,7 @@ class KnockoutRuntime
                         $onError(sprintf('Error: unexpected argument $fff%s$g (expected $fffon$g or $fffoff$g)', $args[1]));
                     }
                     break;
-    
+
                 // /ko authorskip <for_top_x_players>
                 case 'authorskip':
                     if (is_null($args[1]))
@@ -4271,7 +4271,7 @@ class KnockoutRuntime
                         $content = implode(
                             '',
                             array_map(
-                                function($str) { return sprintf("\n        %s", $str); }, 
+                                function($str) { return sprintf("\n        %s", $str); },
                                 $commands
                             )
                         );
@@ -4281,7 +4281,7 @@ class KnockoutRuntime
                         );
                     }
                     break;
-    
+
                 default:
                     $onError(sprintf('Syntax error: unexpected argument $fff%s$g (see $fff/ko help$g for usages)', $args[0]));
                     break;
@@ -4291,10 +4291,10 @@ class KnockoutRuntime
 
     /**
      * Displays a dialog with information about the KO.
-     * 
+     *
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
-     * 
+     *
      *     $issuer = [
      *         [0] => (string) The login of the player who issued the command.
      *         [1] => (string) The nickname of the player who issued the command.
@@ -4319,7 +4319,7 @@ class KnockoutRuntime
                 'The event is held every Friday at 22:00 CET/CEST. We usually play KO9 (Stunts) the first Friday of the',
                 'month and other track groups the other weeks.'
             )),
-            
+
             implode("\n", array(
                 'When the knockout starts, everyone is put to play. If the HUD is enabled, a status bar is shown at the top',
                 '(click on the TMGery button on the top left to enable/disable). We usually play Rounds with one',
@@ -4351,10 +4351,10 @@ class KnockoutRuntime
 
     /**
      * Invoked when a player does not want to participate in the KO.
-     * 
+     *
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
-     * 
+     *
      *     $issuer = [
      *         [0] => (string) The login of the player who issued the command.
      *         [1] => (string) The nickname of the player who issued the command.
@@ -4432,14 +4432,14 @@ class KnockoutRuntime
         else
         {
             $msg = sprintf('Syntax error: unexpected argument $fff%s$g (expected $fff/opt out$g)', $args[0]);
-            Chat::error($msg, array($issuerLogin)); 
+            Chat::error($msg, array($issuerLogin));
         }
     }
 
     /**
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
-     * 
+     *
      *     $issuer = [
      *         [0] => (string) The login of the player who issued the command.
      *         [1] => (string) The nickname of the player who issued the command.
@@ -4462,7 +4462,7 @@ class KnockoutRuntime
     /**
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
-     * 
+     *
      *     $issuer = [
      *         [0] => (string) The login of the player who issued the command.
      *         [1] => (string) The nickname of the player who issued the command.
@@ -4485,7 +4485,7 @@ class KnockoutRuntime
     /**
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
-     * 
+     *
      *     $issuer = [
      *         [0] => (string) The login of the player who issued the command.
      *         [1] => (string) The nickname of the player who issued the command.
@@ -4509,9 +4509,9 @@ class KnockoutRuntime
 
     /**
      * Called when a player clicks on a button.
-     * 
+     *
      * @param array $args Arguments to the command.
-     * 
+     *
      *     $args = [
      *         [0] => (int) The player UID.
      *         [1] => (string) The player login.
