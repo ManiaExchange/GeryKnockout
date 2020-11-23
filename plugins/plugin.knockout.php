@@ -1531,9 +1531,9 @@ class KOMultiplier
             case self::Constant:
                 return sprintf('Constant (%d %s per round)', $this->value, $this->value === 1 ? 'KO' : 'KOs');
             case self::Extra:
-                return sprintf('Extra (KO per %d players)', $this->value);
+                return sprintf('Extra (KO per %d %s)', $this->value, $this->value === 1 ? 'player' : 'players');
             case self::Dynamic:
-                return sprintf('Dynamic (aiming for %d rounds)', $this->value);
+                return sprintf('Dynamic (aiming for %d %s)', $this->value, $this->value === 1 ? 'round' : 'rounds');
             case self::Tiebreaker:
                 return sprintf('Tiebreaker (%d %s remaining)', $this->value, $this->value === 1 ? 'KO' : 'KOs');
             default:
@@ -1601,9 +1601,10 @@ class KOMultiplier
      */
     private function baseCurve()
     {
-        return function($round)
+        $totalRounds = $this->value;
+        return function($round) use($totalRounds)
         {
-            $transition = $this->value - 4.75; // round where the amount of kos reaches 1 ko/round again
+            $transition = $totalRounds - 4.75; // round where the amount of kos reaches 1 ko/round again
             if ($round < $transition)
             {
                 return 1 - cos($round * M_PI / ($transition / 2));
