@@ -1213,15 +1213,7 @@ class UI
             elseif ($index === $pointOfNoReturn - 2) return 'ff0f';
             elseif ($index === $pointOfNoReturn - 1) return 'f80f';
             elseif ($index >= $pointOfNoReturn) return 'f00f';
-            else
-            {
-                if (MinimumLogLevel >= Log::Debug)
-                {
-                    Chat::info('Hey voy, the black bar appeared again', array('voyager006'));
-                    Chat::info(sprintf('index: %f, pointOfNoReturn: %f', $index, $pointOfNoReturn), array('voyager006'));
-                }
-                return '000f';
-            }
+            else return '000f';
         };
 
         $formatTime = function($milliseconds)
@@ -1275,8 +1267,9 @@ class UI
             }
         };
 
-        // Top 3, bottom 7. The + is an array union operator which, contrary to array_merge, will
-        // avoid re-indexing numeric keys https://www.php.net/manual/en/function.array-merge.php
+        // Filter top 3 and bottom 7. The + is an array union operator which, contrary to
+        // array_merge, will avoid re-indexing numeric keys
+        // https://www.php.net/manual/en/function.array-merge.php
         $scoresToDisplay = array_slice($scores, 0, 3, true) + array_slice($scores, -7, 7, true);
 
         $rows = '';
@@ -3326,7 +3319,7 @@ class KnockoutRuntime
                 elseif (count($playersInTheKO) === 1)
                 {
                     $winner = array_pop($playersInTheKO);
-                    Chat::info(sprintf('%s$z$s$g is the Knockout Champ!', $winner['NickName']));
+                    Chat::info(sprintf('%s$z$s$g is the Champ!', $winner['NickName']));
                     $this->stop();
                 }
                 else
@@ -3363,7 +3356,7 @@ class KnockoutRuntime
                         elseif (count($remainingPlayers) === 1)
                         {
                             $winner = array_pop($remainingPlayers);
-                            Chat::info(sprintf('%s$z$s$g is the Knockout Champ!', $winner['NickName']));
+                            Chat::info(sprintf('%s$z$s$g is the Champ!', $winner['NickName']));
                             $this->stop();
                         }
                         else
@@ -4383,6 +4376,7 @@ class KnockoutRuntime
 
     private function cliReference($pageNumber, $logins)
     {
+        $prefix = " \n\$s";
         $sep1 = "\n\n";
         $sep2 = "\n    ";
         $var = '$i';
@@ -4399,7 +4393,7 @@ class KnockoutRuntime
 
                 implode($sep2, array(
                     "/ko stop",
-                    'Stops the knockout with immediate effect'
+                    'Stops the knockout with immediate effect.'
                 )),
 
                 implode($sep2, array(
@@ -4410,7 +4404,7 @@ class KnockoutRuntime
                 implode($sep2, array(
                     "/ko restart [warmup]",
                     'Restarts the current track, or the current round if in Rounds. If "warmup" is given, the track is',
-                    'restarted with a warmup'
+                    'restarted with a warmup.'
                 )),
 
                 implode($sep2, array(
@@ -4433,7 +4427,7 @@ class KnockoutRuntime
                     'Displays or adjusts the number of lives to use for the knockout.'
                 ))
             ));
-            UI::showMultiPageDialog(" \n\$s{$text}", $logins, 1, $totalPages, null, 462);
+            UI::showMultiPageDialog("{$prefix}{$text}", $logins, 1, $totalPages, null, 462);
         }
         elseif ($pageNumber === 2)
         {
@@ -4477,7 +4471,7 @@ class KnockoutRuntime
                     'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
                 ))
             ));
-            UI::showMultiPageDialog(" \n\$s{$text}", $logins, 2, $totalPages, 461, 463);
+            UI::showMultiPageDialog("{$prefix}{$text}", $logins, 2, $totalPages, 461, 463);
         }
         elseif ($pageNumber === 3)
         {
@@ -4494,7 +4488,7 @@ class KnockoutRuntime
 
                 '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l'
             ));
-            UI::showMultiPageDialog(" \n\$s{$text}", $logins, 3, $totalPages, 462, null);
+            UI::showMultiPageDialog("{$prefix}{$text}", $logins, 3, $totalPages, 462, null);
         }
         else
         {
