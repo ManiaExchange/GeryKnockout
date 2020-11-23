@@ -1246,9 +1246,17 @@ class UI
             }
         };
 
-        $box = function($index, $row) use($scores, $getPlacementColor, $format)
+        $DNFs = array_filter($scores, function($score) { return $score['Score'] < 0; });
+        $nonDNFs = array_filter($scores, function($score) { return $score['Score'] >= 0; });
+
+        // Pad the scores such that its length equals the number of players
+        $notFinished = $numberOfPlayers - count($DNFs) - count($nonDNFs);
+        $padding = $notFinished > 0 ? array_fill(0, $notFinished, null) : array();
+        $scoresFormatted = array_merge($nonDNFs, $padding, $DNFs);
+
+        $box = function($index, $row) use($scoresFormatted, $getPlacementColor, $format)
         {
-            $score = $scores[$index];
+            $score = $scoresFormatted[$index];
             $height = 20.25 - 4.5 * $row;
             if (isset($score))
             {
@@ -1270,13 +1278,16 @@ class UI
         // Filter top 3 and bottom 7. The + is an array union operator which, contrary to
         // array_merge, will avoid re-indexing numeric keys
         // https://www.php.net/manual/en/function.array-merge.php
-        $scoresToDisplay = array_slice($scores, 0, 3, true) + array_slice($scores, -7, 7, true);
+        $scoresToDisplay = array_slice($scoresFormatted, 0, 3, true) + array_slice($scoresFormatted, -7, 7, true);
 
         $rows = '';
         $i = 0;
         foreach ($scoresToDisplay as $index => $scoreObj)
         {
-            $rows .= $box($index, $i);
+            if (!is_null($scoreObj))
+            {
+                $rows .= $box($index, $i);
+            }
             $i++;
         }
 
