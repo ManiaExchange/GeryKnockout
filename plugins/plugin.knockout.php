@@ -605,17 +605,13 @@ class Scores
      */
     private function sort($fromIndex)
     {
-        Log::debug('sort 1');
         for ($i = $fromIndex; $i > 0; $i--)
         {
-            Log::debug("sort 2 {$i} {$fromIndex}");
             $current = $this->scores[$i];
             $next = $this->scores[$i - 1];
-            $isBetter =
-                ($current['Score'] > 0)
-                && (($next['Score'] <= 0)
-                    || ($this->isAscending ? ($current['Score'] < $next['Score']) : ($current['Score'] > $next['Score'])));
-            if ($isBetter)
+            $isBetter = $this->isAscending ? ($current['Score'] < $next['Score']) : ($current['Score'] > $next['Score']);
+            $shouldMoveUp = $next['Score'] <= 0 || $isBetter;
+            if ($shouldMoveUp)
             {
                 $this->scores[$i - 1] = $current;
                 $this->scores[$i] = $next;
@@ -639,7 +635,6 @@ class Scores
      */
     public function submitScore($login, $nickName, $score)
     {
-        Log::debug("submitScore {$login} {$score}");
         $logins = array_map(
             function($score) { return $score['Login']; },
             $this->scores
@@ -652,7 +647,7 @@ class Scores
                 'NickName' => $nickName,
                 'Score' => $score
             );
-            if ($score > 0) $this->sort(count($this->scores) - 1);
+            $this->sort(count($this->scores) - 1);
         }
         else
         {
