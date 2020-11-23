@@ -1205,13 +1205,18 @@ class UI
 
     private static function scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers)
     {
+        if (!is_array($scores)) Log::warning(sprintf('scoreboardManialink: expected array $scores but got %s', gettype($scores)));
+        if (!is_int($gameMode)) Log::warning(sprintf('scoreboardManialink: expected int $gameMode but got %s', gettype($gameMode)));
+        if (!is_int($numberOfKOs)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfKOs but got %s', gettype($numberOfKOs)));
+        if (!is_int($numberOfPlayers)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfPlayers but got %s', gettype($numberOfPlayers)));
+
         $pointOfNoReturn = $numberOfPlayers - $numberOfKOs;
         $getPlacementColor = function($score, $index) use($pointOfNoReturn)
         {
             if ($score <= 0) return 'f00f';
-            elseif ($index === 0 || ($index < $pointOfNoReturn - 2)) return '0f0f';
-            elseif ($index === $pointOfNoReturn - 2) return 'ff0f';
-            elseif ($index === $pointOfNoReturn - 1) return 'f80f';
+            elseif ($index == 0 || ($index < $pointOfNoReturn - 2)) return '0f0f';
+            elseif ($index == $pointOfNoReturn - 2) return 'ff0f';
+            elseif ($index == $pointOfNoReturn - 1) return 'f80f';
             elseif ($index >= $pointOfNoReturn) return 'f00f';
             else return '000f';
         };
