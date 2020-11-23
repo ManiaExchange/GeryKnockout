@@ -2886,7 +2886,7 @@ class KnockoutRuntime
     public function onBeginRace($args)
     {
         Log::debug(sprintf('onBeginRace %s', implode(' ', $args[0])));
-        // Note: warmup status is not reflected at this point
+        // Note: round number and warmup status is not reflected at this point
     }
 
     /**
@@ -3407,7 +3407,7 @@ class KnockoutRuntime
      */
     public function onEndRace($args)
     {
-        if (!$this->isWarmup)
+        if (!$this->isWarmup || $this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::SkippingTrack)
         {
             $this->isPodium = true;
         }
