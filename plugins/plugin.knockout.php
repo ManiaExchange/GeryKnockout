@@ -2202,6 +2202,12 @@ class KnockoutRuntime
         }
     }
 
+    private function hudReminder()
+    {
+        $playersWithHudOff = array_keys($this->getPlayersWithHudOff());
+        Chat::info('To enable the HUD, click on the TMGery button in the top left', $playersWithHudOff);
+    }
+
     /**
      * Starts the knockout.
      *
@@ -2223,6 +2229,7 @@ class KnockoutRuntime
             if ($this->isPodium)
             {
                 Chat::announce('Knockout starting!');
+                $this->hudReminder();
             }
             else
             {
@@ -2233,6 +2240,7 @@ class KnockoutRuntime
         {
             $this->koStatus = KnockoutStatus::Running;
             Chat::announce('Knockout starting!');
+            $this->hudReminder();
         }
         else
         {
@@ -3292,6 +3300,7 @@ class KnockoutRuntime
             case KnockoutStatus::Starting:
             case KnockoutStatus::StartingNow:
                 Chat::announce('Knockout starting!');
+                $this->hudReminder();
                 $this->koStatus = KnockoutStatus::Running;
                 $this->adjustPoints(); // SetRoundPointsLimit has to be set before onBeginRound
                 return;
