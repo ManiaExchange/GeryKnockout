@@ -2068,15 +2068,12 @@ class KnockoutRuntime
 
     private function updateKoCount()
     {
-        Log::debug('updateKoCount');
         $playerCount = $this->playerList->countPlaying();
         $this->kosThisRound = $this->koMultiplier->getKOsThisRound($this->roundNumber, $playerCount);
     }
 
     private function updateStatusBar($login = null)
     {
-        Log::debug(sprintf('updateStatusBar %s', $login));
-
         // Make KO GUI optional together with Tm-Gery GUI
         $playersWithHudOn = array();
         if ($login !== null)
@@ -2099,7 +2096,6 @@ class KnockoutRuntime
 
     private function updateScoreboard($login = null)
     {
-        Log::debug(sprintf('updateScoreboard %s', $login));
         $scores = $this->scores->getSortedScores();
         $nbKOs = $this->kosThisRound;
         $numberOfPlayers = $this->playerList->countPlaying();
@@ -2109,7 +2105,6 @@ class KnockoutRuntime
 
     private function announceRoundInChat($login = null)
     {
-        Log::debug(sprintf('announceRoundInChat %s', $login));
         $playersWithHudOff = array();
         if ($login !== null)
         {
@@ -2187,7 +2182,6 @@ class KnockoutRuntime
 
     private function reflectScoringWithGameMode()
     {
-        Log::debug(sprintf('reflectScoringWithGameMode %s', $this->gameMode));
         switch ($this->gameMode)
         {
             case GameMode::Stunts:
@@ -2423,8 +2417,6 @@ class KnockoutRuntime
 
     private function onTrackChange()
     {
-        Log::debug('onTrackChange');
-
         if ($this->koStatus !== KnockoutStatus::Idle)
         {
             $this->koStatus = KnockoutStatus::Running;
@@ -2436,25 +2428,18 @@ class KnockoutRuntime
 
     private function letKnockedOutPlayersPlay()
     {
-        Log::debug('letKnockedOutPlayersPlay');
-
-        if ($this->openWarmup)
-        {
-            forcePlay(
-                logins($this->playerList->filterByStatus(PlayerStatus::KnockedOut)),
-                false
-            );
-            forceSpec(
-                logins($this->playerList->filterByStatus(PlayerStatus::KnockedOutAndSpectating)),
-                false
-            );
-        }
+        forcePlay(
+            logins($this->playerList->filterByStatus(PlayerStatus::KnockedOut)),
+            false
+        );
+        forceSpec(
+            logins($this->playerList->filterByStatus(PlayerStatus::KnockedOutAndSpectating)),
+            false
+        );
     }
 
     private function putKnockedOutPlayersIntoSpec()
     {
-        Log::debug('putKnockedOutPlayersIntoSpec');
-
         forceSpec(
             logins($this->playerList->filterByStatus(PlayerStatus::KnockedOut)),
             true
@@ -2467,8 +2452,6 @@ class KnockoutRuntime
 
     private function ko($login, $score)
     {
-        Log::debug("ko {$login} {$score}");
-
         $player = $this->playerList->get($login);
         $nickName = $player['NickName'];
         $isKO = $this->playerList->subtractLife($login);
@@ -2500,23 +2483,19 @@ class KnockoutRuntime
             return false;
         }
 
-        Log::debug('ko1');
         $i = count($scores) - 1;
         $lastPlayerLogin = $scores[$i]['Login'];
         $lastPlayerScore = $scores[$i]['Score'];
 
         if ($lastPlayerScore <= 0)
         {
-            Log::debug('ko2');
             $this->ko($lastPlayerLogin, $lastPlayerScore);
             array_pop($scores);
-            Log::debug('ko3');
             // $rest = array_slice($scores, 0, -1, true);
             return $this->recursiveKO($scores, $nbKOs - 1);
         }
         elseif ($nbKOs > 0)
         {
-            Log::debug('ko4');
             // Check if there are players with the same score, and how many
             $j = $i - 1;
             while ($j >= 0 && isset($scores[$j]) && $scores[$j]['Score'] === $lastPlayerScore)
@@ -2525,7 +2504,6 @@ class KnockoutRuntime
             }
             if ($i - $j > $nbKOs)
             {
-                Log::debug(sprintf('rec3 %d %d', $i, $j));
                 // Return tied players
                 $tiedPlayers = array_map(
                     function($score) { return $score['Login']; },
@@ -2538,10 +2516,8 @@ class KnockoutRuntime
             }
             else
             {
-                Log::debug('ko4');
                 $this->ko($lastPlayerLogin, $lastPlayerScore);
                 array_pop($scores);
-                Log::debug('ko5');
                 return $this->recursiveKO($scores, $nbKOs - 1);
             }
         }
@@ -2788,9 +2764,8 @@ class KnockoutRuntime
      */
     private function restartTrack()
     {
-        // Changing some setting that takes effect on next challenge
-        // (like setting a new game mode) makes RestartChallenge restart the
-        // whole challenge, including warmup
+        // Changing some setting that takes effect on next challenge (like setting a new game mode)
+        // makes RestartChallenge restart the whole challenge, including warmup
         QueryManager::query('SetChatTime', 5000);
         QueryManager::query('SetGameMode', GameMode::Team);
         QueryManager::query('SetGameMode', $this->gameMode);
@@ -2805,7 +2780,8 @@ class KnockoutRuntime
         QueryManager::query('SetChatTime', $this->defaultChatTime);
         $playerCount = count($this->playerList->getPlayingOrShelved());
         $nbKOs = $this->kosThisRound;
-        // Changing game settings has immediate effect as long as you change them by the start of the round
+        // Changing game settings has immediate effect as long as you change them by the start of
+        // the round
         if ($playerCount - $nbKOs <= 1 && $this->gameMode === GameMode::Rounds)
         {
             // Adjust the points limit such that this is the last round
@@ -2915,7 +2891,7 @@ class KnockoutRuntime
             {
                 if ($this->isWarmup)
                 {
-                    $this->letKnockedOutPlayersPlay(); // Check if this works
+                    if ($this->openWarmup) $this->letKnockedOutPlayersPlay();
                 }
                 else
                 {
@@ -3440,10 +3416,13 @@ class KnockoutRuntime
                         $this->replaceNextTrackIfNeeded();
                     }
                     // Put user selectable for KO'd and spectating players during podium
-                    $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
-                    if ($warmup['NextValue'] > 0)
+                    if ($this->openWarmup)
                     {
-                        $this->letKnockedOutPlayersPlay();
+                        $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
+                        if ($warmup['NextValue'] > 0)
+                        {
+                            $this->letKnockedOutPlayersPlay();
+                        }
                     }
                     Log::debug(sprintf('setting points limit to %d', $this->maxRounds));
                     QueryManager::query('SetRoundPointsLimit', $this->maxRounds);
@@ -3465,10 +3444,13 @@ class KnockoutRuntime
                 if ($this->isPodium)
                 {
                     // Put user selectable for KO'd and spectating players during podium
-                    $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
-                    if ($warmup['NextValue'] > 0)
+                    if ($this->openWarmup)
                     {
-                        $this->letKnockedOutPlayersPlay();
+                        $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
+                        if ($warmup['NextValue'] > 0)
+                        {
+                            $this->letKnockedOutPlayersPlay();
+                        }
                     }
                     Log::debug(sprintf('setting points limit to %d', $this->maxRounds));
                     QueryManager::query('SetRoundPointsLimit', $this->maxRounds);
@@ -4404,116 +4386,118 @@ class KnockoutRuntime
         $endvar = '$i';
         $totalPages = 3;
 
-        if ($pageNumber === 1)
+        switch ($pageNumber)
         {
-            $text = implode($sep1, array(
-                implode($sep2, array(
-                    "/ko start [now]",
-                    'Starts the knockout. If "now" is given, the current track will be skipped.'
-                )),
+            case 1:
+                $text = implode($sep1, array(
+                    implode($sep2, array(
+                        "/ko start [now]",
+                        'Starts the knockout. If "now" is given, the current track will be skipped.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko stop",
-                    'Stops the knockout with immediate effect.'
-                )),
+                    implode($sep2, array(
+                        "/ko stop",
+                        'Stops the knockout with immediate effect.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko skip [warmup]",
-                    'Skips the current track. If "warmup" is given, only the warmup is skipped.'
-                )),
+                    implode($sep2, array(
+                        "/ko skip [warmup]",
+                        'Skips the current track. If "warmup" is given, only the warmup is skipped.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko restart [warmup]",
-                    'Restarts the current track, or the current round if in Rounds. If "warmup" is given, the track is',
-                    'restarted with a warmup.'
-                )),
+                    implode($sep2, array(
+                        "/ko restart [warmup]",
+                        'Restarts the current track, or the current round if in Rounds. If "warmup" is given, the track is',
+                        'restarted with a warmup.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko add ({$var}login{$endvar} | *)",
-                    'Adds a player to the knockout. If the wildcard * is used, then everyone on the server is added.'
-                )),
+                    implode($sep2, array(
+                        "/ko add ({$var}login{$endvar} | *)",
+                        'Adds a player to the knockout. If the wildcard * is used, then everyone on the server is added.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko remove ({$var}login{$endvar} | *)",
-                    'Removes a player from the knockout, regardless of how many lives they have.'
-                )),
+                    implode($sep2, array(
+                        "/ko remove ({$var}login{$endvar} | *)",
+                        'Removes a player from the knockout, regardless of how many lives they have.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko spec ({$var}login{$endvar} | *)",
-                    'Same as /ko remove but instead puts the player into spectator status.'
-                )),
+                    implode($sep2, array(
+                        "/ko spec ({$var}login{$endvar} | *)",
+                        'Same as /ko remove but instead puts the player into spectator status.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko lives ({$var}login{$endvar} | *) [[+ | -]{$var}lives{$endvar}]",
-                    'Displays or adjusts the number of lives to use for the knockout.'
-                ))
-            ));
-            UI::showMultiPageDialog("{$prefix}{$text}", $logins, 1, $totalPages, null, 462);
-        }
-        elseif ($pageNumber === 2)
-        {
-            $text = implode($sep1, array(
-                implode($sep2, array(
-                    "/ko multi (constant {$var}kos{$endvar} | extra {$var}per_x_players{$endvar} | dynamic {$var}total_rounds{$endvar} | none)",
-                    'Sets the KO multiplier mode.',
-                    '- Constant: x KOs per round',
-                    '- Extra: +1 KO for every x\'th player',
-                    '- Dynamic: Aims for a total of x rounds',
-                    '- None: 1 KO per round'
-                )),
+                    implode($sep2, array(
+                        "/ko lives ({$var}login{$endvar} | *) [[+ | -]{$var}lives{$endvar}]",
+                        'Displays or adjusts the number of lives to use for the knockout.'
+                    ))
+                ));
+                UI::showMultiPageDialog("{$prefix}{$text}", $logins, 1, $totalPages, null, 462);
+                break;
 
-                implode($sep2, array(
-                    "/ko rounds {$var}rounds{$endvar}",
-                    'Sets the number of rounds per track to play in Rounds.'
-                )),
+            case 2:
+                $text = implode($sep1, array(
+                    implode($sep2, array(
+                        "/ko multi (constant {$var}kos{$endvar} | extra {$var}per_x_players{$endvar} | dynamic {$var}total_rounds{$endvar} | none)",
+                        'Sets the KO multiplier mode.',
+                        '- Constant: x KOs per round',
+                        '- Extra: +1 KO for every x\'th player',
+                        '- Dynamic: Aims for a total of x rounds',
+                        '- None: 1 KO per round'
+                    )),
 
-                implode($sep2, array(
-                    "/ko openwarmup (on | off)",
-                    'Enables or disables open warmup which lets knocked out players play during warmup.'
-                )),
+                    implode($sep2, array(
+                        "/ko rounds {$var}rounds{$endvar}",
+                        'Sets the number of rounds per track to play in Rounds.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko falsestart {$var}max_tries{$endvar}",
-                    'Sets the limit for how many times the round will be restarted if someone retires before the countdown.'
-                )),
+                    implode($sep2, array(
+                        "/ko openwarmup (on | off)",
+                        'Enables or disables open warmup which lets knocked out players play during warmup.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko tiebreaker (on | off)",
-                    'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and at not all of them would be knocked out.'
-                )),
+                    implode($sep2, array(
+                        "/ko falsestart {$var}max_tries{$endvar}",
+                        'Sets the limit for how many times the round will be restarted if someone retires before the countdown.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko authorskip {$var}for_top_x_players{$endvar}",
-                    'Automatically skips a track when its author is present, once a given player count has been reached.'
-                )),
+                    implode($sep2, array(
+                        "/ko tiebreaker (on | off)",
+                        'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and at not all of them would be knocked out.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko settings",
-                    'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
-                ))
-            ));
-            UI::showMultiPageDialog("{$prefix}{$text}", $logins, 2, $totalPages, 461, 463);
-        }
-        elseif ($pageNumber === 3)
-        {
-            $text = implode($sep1, array(
-                implode($sep2, array(
-                    "/ko status",
-                    'Shows knockout mode, knockout status, player list and scores in a dialog window.'
-                )),
+                    implode($sep2, array(
+                        "/ko authorskip {$var}for_top_x_players{$endvar}",
+                        'Automatically skips a track when its author is present, once a given player count has been reached.'
+                    )),
 
-                implode($sep2, array(
-                    "/ko help",
-                    'Shows the list of commands.'
-                )),
+                    implode($sep2, array(
+                        "/ko settings",
+                        'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
+                    ))
+                ));
+                UI::showMultiPageDialog("{$prefix}{$text}", $logins, 2, $totalPages, 461, 463);
+                break;
 
-                '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l'
-            ));
-            UI::showMultiPageDialog("{$prefix}{$text}", $logins, 3, $totalPages, 462, null);
-        }
-        else
-        {
-            Log::warning(sprintf('Tried to retrieve non-existing page $d of CLI reference', $pageNumber));
+            case 3:
+                $text = implode($sep1, array(
+                    implode($sep2, array(
+                        "/ko status",
+                        'Shows knockout mode, knockout status, player list and scores in a dialog window.'
+                    )),
+
+                    implode($sep2, array(
+                        "/ko help",
+                        'Shows the list of commands.'
+                    )),
+
+                    '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l'
+                ));
+                UI::showMultiPageDialog("{$prefix}{$text}", $logins, 3, $totalPages, 462, null);
+                break;
+
+            default:
+                Log::warning(sprintf('Tried to retrieve non-existing page $d of CLI reference', $pageNumber));
+                break;
         }
     }
 
@@ -4749,7 +4733,7 @@ class KnockoutRuntime
     public function playerManialinkPageAnswer($args)
     {
         global $PlayerScript;
-        Log::debug('playerManialinkPageAnswer');
+        Log::debug(sprintf('playerManialinkPageAnswer %s', implode(' ', $args)));
 
         $login = $args[1];
         switch ($args[2])
@@ -4782,12 +4766,10 @@ class KnockoutRuntime
                 else
                 {
                     $this->playerList->setStatus($login, PlayerStatus::OptingOut);
-                    // $this->playerList->setLives($login, 0);
                 }
                 forceSpec(array($login), true);
                 $this->onKoStatusUpdate();
                 Chat::info(sprintf('%s$z$s$g has opted out of the knockout', $playerObj['NickName']));
-                // Chat::info('You have opted out of the KO', array($login));
                 break;
 
             case 461:

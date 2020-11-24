@@ -36,7 +36,7 @@ Clone this repository to a folder of your choice. Using Visual Studio Code, [PHP
 - [@Voyager006](https://github.com/Voyager006) - main plugin work, documentation
 - [@stefan-baumann](https://github.com/stefan-baumann) - dynamic KO multiplier algorithm, graphs
 
-## Credits
+## Thanks to...
 - MrA for suggesting a progressive KO multiplier
 - Dennis for suggesting the syntax for the `/ko lives` command
 - Realspace for suggesting the tiebreaker mode
