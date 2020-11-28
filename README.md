@@ -4,7 +4,7 @@ Knockout plugin for the TMGery server controller.
 [CLI reference](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md) | [User guide](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md) | [Report a bug](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose) | [Suggest a feature](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose)
 
 ## About
-This repository contains a plugin for TMGery that enables knockout competitions to be held. Each round, the last players to finish, or those who don't finish, are knocked out until one player remains as the winner. This plugin is used in the TMX Knockout United.
+This repository contains a plugin for TMGery that enables knockout competitions to be held. Each round, the last players are knocked out until one player remains. This plugin is used in the TMX Knockout United.
 
 ## Prerequisites
 - Trackmania dedicated server
@@ -26,6 +26,9 @@ Then, restart the controller (using `/die` in-game or rebooting the script) to a
 ## Development
 Clone this repository to a folder of your choice. Using Visual Studio Code, [PHP Intelephense](https://marketplace.visualstudio.com/items?itemName=bmewburn.vscode-intelephense-client) and [EditorConfig for VS Code
 ](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) is recommended. Using this setup, copy `tm_gery.php`, `includes\plugin_manager.php` and `includes\GbxRemote.php` from your TMGery installation to a new top level folder `dependencies`. Files in this folder are ignored by `.gitignore`, so you should see them grey out.
+
+## Contribution
+You may contribute to this project by [reporting bugs](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose), [suggesting new features](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose) or creating pull requests that addresses particular issues. Please consult [CONTRIBUTING.md](https://github.com/ManiaExchange/GeryKnockout/blob/main/CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](https://github.com/ManiaExchange/GeryKnockout/blob/main/CODE_OF_CONDUCT.md) if you plan to contribute on the coding part.
 
 ## Screenshots
 ![In-game screenshot showing the status bar](docs/img/screenshot-status-bar-324p.png)
