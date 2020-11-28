@@ -4733,17 +4733,16 @@ class KnockoutRuntime
             // Tm-Gery GUI button
             case 98:
                 // TmGery has already changed the state of PlayerScript by now
-                if (!KnockoutStatus::isInProgress($this->koStatus))
+                if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
                 {
-                    // Do nothing
-                }
-                elseif ($PlayerScript[$login] === '1')
-                {
-                    $this->updateStatusBar($login);
-                }
-                else
-                {
-                    UI::hideStatusBar(array($login));
+                    if ($PlayerScript[$login] === '1')
+                    {
+                        $this->updateStatusBar($login);
+                    }
+                    else
+                    {
+                        UI::hideStatusBar(array($login));
+                    }
                 }
                 break;
 
