@@ -9,10 +9,10 @@ assignees: ''
 
 Please include
 
-- What happened prior to the bug/crash
-- A screenshot of `/ko status`, if TMGery didn't crash
-- Console output, if accessible
-- Steps to reproduce the bug, if possible
+- What happened prior to the bug/crash.
+- A screenshot of `/ko status`, if TMGery didn't crash.
+- Console output, if accessible.
+- Steps to reproduce the bug, if possible.
 
 If there is sensitive information, you may send the output in a DM to Voyager006#8530 on Discord.
 
