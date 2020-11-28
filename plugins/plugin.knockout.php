@@ -609,8 +609,17 @@ class Scores
         {
             $current = $this->scores[$i];
             $next = $this->scores[$i - 1];
-            $isBetter = $this->isAscending ? ($current['Score'] < $next['Score']) : ($current['Score'] > $next['Score']);
-            $shouldMoveUp = $next['Score'] <= 0 || $isBetter;
+            $shouldMoveUp = false;
+            if ($current['Score'] <= 0)
+            {
+                // Prioritize later DNFs over earlier DNFs
+                $shouldMoveUp = $next['Score'] <= 0;
+            }
+            else
+            {
+                $isBetter = $this->isAscending ? ($current['Score'] < $next['Score']) : ($current['Score'] > $next['Score']);
+                $shouldMoveUp = $next['Score'] <= 0 || $isBetter;
+            }
             if ($shouldMoveUp)
             {
                 $this->scores[$i - 1] = $current;
@@ -1200,10 +1209,10 @@ class UI
 
     private static function scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers)
     {
-        if (!is_array($scores)) Log::warning(sprintf('scoreboardManialink: expected array $scores but got %s', gettype($scores)));
-        if (!is_int($gameMode)) Log::warning(sprintf('scoreboardManialink: expected int $gameMode but got %s', gettype($gameMode)));
-        if (!is_int($numberOfKOs)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfKOs but got %s', gettype($numberOfKOs)));
-        if (!is_int($numberOfPlayers)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfPlayers but got %s', gettype($numberOfPlayers)));
+        if (!is_array($scores)) Log::warning(sprintf('scoreboardManialink: expected array $scores but got %s (%s)', $scores, gettype($scores)));
+        if (!is_int($gameMode)) Log::warning(sprintf('scoreboardManialink: expected int $gameMode but got %s (%s)', $gameMode, gettype($gameMode)));
+        if (!is_int($numberOfKOs)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfKOs but got %s (%s)', $numberOfKOs, gettype($numberOfKOs)));
+        if (!is_int($numberOfPlayers)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfPlayers but got %s (%s)', $numberOfPlayers, gettype($numberOfPlayers)));
 
         $pointOfNoReturn = $numberOfPlayers - $numberOfKOs;
         $getPlacementColor = function($score, $index) use($pointOfNoReturn)
@@ -1412,7 +1421,7 @@ class UI
             <manialink id="440">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="-40 43 1">
-                    <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1InRace" substyle="BgWindow3" />
+                    <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
                     <label posn="0 0 1" sizen="80 3" halign="left" style="TextStaticSmall">' . $text . '</label>
                     <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="99">Ok</label>
                 </frame>
@@ -1447,7 +1456,7 @@ class UI
             <manialink id="440">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="-40 43 1">
-                    <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1InRace" substyle="BgWindow3" />
+                    <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
                     <label posn="0 0 1" sizen="80 3" halign="left" style="TextStaticSmall">' . $text . '</label>
                     <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="99">Ok</label>
                     <frame posn="72 -73 1">
@@ -1563,21 +1572,8 @@ class KOMultiplier
             case self::Constant:
                 return $this->value;
             case self::Extra:
-                return ceil($numberOfPlayersLeft / $this->value);
+                return (int) ceil($numberOfPlayersLeft / $this->value);
             case self::Dynamic:
-                // if (MinimumLogLevel === Log::Debug)
-                // {
-                //     $projection = array();
-                //     $players = 26;
-                //     for ($i = 1; $i <= 20; $i++)
-                //     {
-                //         $func = $this->solveCurve($this->baseCurve(), $i, 20, $players, 1);
-                //         $kos = $func($i);
-                //         $projection[] = $kos;
-                //         $players -= $kos;
-                //     }
-                //     Log::debug('Dynamic KO be like ' . print_r($projection, true));
-                // }
                 $func = $this->solveCurve($this->baseCurve(), $roundNumber, $this->value, $numberOfPlayersLeft, 1);
                 return $func($roundNumber);
             case self::Tiebreaker:
@@ -1791,10 +1787,9 @@ class KOMultiplier
 function hasHudOn($login)
 {
     global $PlayerScript;
-    $playerObj = $PlayerScript[$login];
-    if (!is_null($playerObj))
+    if (isset($PlayerScript[$login]))
     {
-        return $playerObj === '1';
+        return $PlayerScript[$login] === '1';
     }
     else
     {
@@ -1813,10 +1808,9 @@ function hasHudOn($login)
 function hasHudOff($login)
 {
     global $PlayerScript;
-    $playerObj = $PlayerScript[$login];
-    if (!is_null($playerObj))
+    if (isset($PlayerScript[$login]))
     {
-        return $playerObj !== '1';
+        return $PlayerScript[$login] !== '1';
     }
     else
     {
@@ -1982,7 +1976,6 @@ class KnockoutRuntime
 
     // Defaults
     private $defaultVoteTimeout = 60;
-    private $defaultChatTime = 5000;
     private $defaultPointsLimit = 10;
     private $defaultPointPartition = array(10, 8, 7, 6, 5, 4, 3, 2, 1);
     private $authorSkipLimit = 10;
@@ -2256,7 +2249,6 @@ class KnockoutRuntime
         $this->playerList->reset();
         $this->scores->reset();
         QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
-        QueryManager::query('SetChatTime', $this->defaultChatTime);
         QueryManager::query('SetRoundCustomPoints', $this->defaultPointPartition);
         // Todo: set round points limit later (can't be done now)
         Log::debug(sprintf('setting points limit to %d', $this->defaultPointsLimit));
@@ -2766,10 +2758,12 @@ class KnockoutRuntime
     {
         // Changing some setting that takes effect on next challenge (like setting a new game mode)
         // makes RestartChallenge restart the whole challenge, including warmup
-        QueryManager::query('SetChatTime', 5000);
+        $chattime = QueryManager::queryWithResponse('GetChatTime');
+        QueryManager::query('SetChatTime', 0);
         QueryManager::query('SetGameMode', GameMode::Team);
         QueryManager::query('SetGameMode', $this->gameMode);
         QueryManager::query('RestartChallenge');
+        QueryManager::query('SetChatTime', $chattime['NextValue']);
     }
 
     /**
@@ -2777,7 +2771,6 @@ class KnockoutRuntime
      */
     private function adjustPoints()
     {
-        QueryManager::query('SetChatTime', $this->defaultChatTime);
         $playerCount = count($this->playerList->getPlayingOrShelved());
         $nbKOs = $this->kosThisRound;
         // Changing game settings has immediate effect as long as you change them by the start of
@@ -4350,7 +4343,6 @@ class KnockoutRuntime
                             sprintf('Is warmup: %d', $this->isWarmup),
                             sprintf('Is podium: %d', $this->isPodium),
                             sprintf('Game mode: %s', getNameOfConstant($this->gameMode, 'GameMode')),
-                            sprintf('Default chat time: %d', $this->defaultChatTime),
                             sprintf('Player list: %s', print_r($playerList, true)),
                             sprintf('Scores: %s', print_r($scores, true))
                         ));
