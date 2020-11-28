@@ -3000,6 +3000,8 @@ class KnockoutRuntime
         $login = $args[0];
         $joinsAsSpectator = $args[1];
         $playerInfo = QueryManager::queryWithResponse('GetPlayerInfo', $login);
+        // Only disconnected players who are eligible to rejoin should be matched here; see
+        // onPlayerDisconnect
         if ($this->playerList->exists($login))
         {
             $player = $this->playerList->get($login);
@@ -3017,7 +3019,7 @@ class KnockoutRuntime
                     break;
 
                 default:
-                    Log::warning(sprintf('Player rejoined with status %s', $player['Status']));
+                    Log::warning(sprintf('Player connected with status %s', $player['Status']));
                     break;
             }
         }
@@ -3044,7 +3046,7 @@ class KnockoutRuntime
                 forceSpec(array($login), true);
             }
         }
-        if (KnockoutStatus::isInProgress($this->koStatus))
+        if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
         {
             $this->updateStatusBar($login);
             $this->announceRoundInChat($login);
@@ -3081,6 +3083,10 @@ class KnockoutRuntime
             case PlayerStatus::KnockedOut:
             case PlayerStatus::KnockedOutAndSpectating:
                 $this->playerList->remove($login);
+                break;
+
+            default:
+                Log::warning(sprintf('Player disconnected with status %s', $player['Status']));
                 break;
         }
     }
