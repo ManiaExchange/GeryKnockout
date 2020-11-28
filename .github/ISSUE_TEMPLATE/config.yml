@@ -5,7 +5,4 @@ contact_links:
     about: Discuss the TMX Knockout United event in the `#knockouts` channel.
   - name: The TMX Admin & Mod Team
     url: https://united.tm-exchange.com/?action=postupdate&id=contactus
-    about: Please report user behaviour and issues not relevant to the knockout plugin here.
-  - name: Email
-    url: 
-    about: Please report security vulnerabilities by [email](mailto:voyager006@outlook.com?subject=[GitHub]%20GeryKnockout).
+    about: Please report user behaviour and security vulnerabilities here.
