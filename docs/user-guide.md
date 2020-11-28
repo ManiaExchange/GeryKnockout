@@ -15,8 +15,6 @@ Supported game modes include Rounds, Time Attack and Stunts. Laps, Cup and Team 
 ## Command-line interface
 The plugin includes a command-line interface which can be used to configure the knockout.
 
-### Running a knockout
-
 To start the knockout, use [/ko start](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-start-now). This command may be combined with others depending on the usage:
 
 - `/ko start`
@@ -58,6 +56,8 @@ The knockout can be further customized by the following settings:
 - [/ko authorskip *for_top_x_players*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-authorskip-for_top_x_players) - skip tracks if the author is participating
 
 These settings are displayed when starting the knockout, but you can use `/ko settings` to display them as well.
+
+Public info messages are shown in white ($fff), non-public info messages in grey ($aaa) and error messages in red ($f00).
 
 A full overview of the commands is listed in [cli.md](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md).
 
@@ -122,9 +122,9 @@ First, a base curve `base_curve(r)` is defined. It defines the relative amount o
 
 ![A graph of the base curve](img/dynamic-kos-base-curve-320p.png)
 
-Then, the goal is to find a discretized, scaled curve `c[r] = [a * base_curve(r)] + 1` such that the sum over `c[r]` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c[r]` until we find a value for `a` of which the sum of `c[r]` equals the total number of KOs.
+Then, the goal is to find a discretized, scaled curve `c[r] = [a * base_curve(r)] + 1` such that the sum over `c[r]` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c[r]`. If the sum is too small, `a` is incremented; too big and `a` is decremented. This is repeated until we find a value for `a` of which the sum of `c[r]` equals the total number of KOs.
 
-With a player count of 40, number of rounds set to 20 and no unexpected KOs, the number of KOs/round and overall player count will look like the following:
+With 40 players, 20 rounds and no unexpected KOs, the number of KOs/round and overall player count will look like the following:
 
 ![Graphs showing player count and KOs per round with no unexpected KOs](img/dynamic-kos-example-normal-320p.png)
 
@@ -132,7 +132,7 @@ Each round, the curve is recalculated to adjust for any inaccuracies. In the cas
 
 ![Graphs showing player count and KOs per round with unexpected KOs](img/dynamic-kos-example-unexpected-kos-320p.png)
 
-The algorithm is also defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
+The base curve is defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
 
 Using this approach, we can observe that the number of KOs/round will increase and decrease steadily; the number of KOs/round will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
 
@@ -209,8 +209,6 @@ Secondly, there are also some changes concerning the CLI:
 
 - Commands now use the same format as in the MX Knockout, which means that they follow the pattern `/kostart` -> `/ko start`.
 - `/ko start` will not skip to next track by default. To immediately skip to the next track, use `/ko start now`.
-- Commands `/ko start now`, `/ko restart` and `/ko skip` now work when issued during a synchronization phase; these will take effect after a small delay (when the round starts).
-- Public info messages are shown in white ($fff), non-public info messages are in grey ($aaa) and error messages are in red ($f00).
 
 Updated admin commands:
 
@@ -261,6 +259,7 @@ The following bugs have been fixed since v.082.9:
 - Fixed bug where forcing a player in as the third player will end the knockout afterwards.
 - Fixed bug where the winner of a previous knockout would be crowned as the winner when stopping a knockout manually.
 - Patched vulnerability where the script will KO everyone if `/restart` or `/gonext` is used.
+- Commands for starting a knockout, restarting a map and skipping a map now work when issued during the synchronization phase; these will take effect after a small delay (when the round starts).
 
 `/restart`, `/gonext` and `/end` can be used interchangeably with `/ko restart`, `/ko skip` and `/ko skip warmup` respectively, as long as no one has finished yet. Though, the new commands offer new functionality such as restarting the current track with a warmup (using `/ko restart warmup`), protection against unwanted KOs if someone have finished, and proper state management (status is reflected in the top bar).
 
