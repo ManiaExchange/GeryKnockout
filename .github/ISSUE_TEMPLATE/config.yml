@@ -1,0 +1,10 @@
+blank_issues_enabled: true
+contact_links:
+  - name: TMX Discord
+    url: https://discordapp.com/invite/Ttkw54Y
+    about: Discuss the knockout in #knockouts.
+  - name: The TMX Admin & Mod Team
+    url: https://united.tm-exchange.com/?action=postupdate&id=contactus
+    about: Please report user behaviour and issues not relevant to the knockout plugin here.
+  - name: Voyager006#8530
+    about: Please report security vulnerabilities through DMs in Discord.
