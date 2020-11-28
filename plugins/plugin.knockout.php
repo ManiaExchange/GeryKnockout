@@ -2311,16 +2311,23 @@ class KnockoutRuntime
             else
             {
                 $target = $this->playerList->get($login);
-                $shouldDNF =
-                    ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
-                    && PlayerStatus::isIn($target['Status']);
-                if ($shouldDNF)
-                {
-                    $this->scores->set($login, $target['NickName'], Scores::DidNotFinish);
-                }
                 switch ($target['Status'])
                 {
                     case PlayerStatus::Playing:
+                        $shouldDNF =
+                            ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
+                            && PlayerStatus::isIn($target['Status']);
+                        if ($shouldDNF)
+                        {
+                            $this->scores->set($login, $target['NickName'], Scores::DidNotFinish);
+                            $this->playerList->setLives($login, 1);
+                        }
+                        else
+                        {
+                            $this->playerList->setStatus($login, $status);
+                            $this->playerList->setLives($login, 0);
+                        }
+                        break;
                     case PlayerStatus::Shelved:
                         $this->playerList->setStatus($login, $status);
                         $this->playerList->setLives($login, 0);
@@ -2454,6 +2461,10 @@ class KnockoutRuntime
                 ? sprintf('%s$z$s$g has been KO\'d by a worst place finish', $nickName)
                 : sprintf('%s$z$s$g has been KO\'d by a DNF', $nickName);
             Chat::info($msg);
+            if (PlayerStatus::isDisconnected($player['Status']))
+            {
+                $this->playerList->remove($login);
+            }
         }
         else
         {
