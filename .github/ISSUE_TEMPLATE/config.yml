@@ -7,5 +7,5 @@ contact_links:
     url: https://united.tm-exchange.com/?action=postupdate&id=contactus
     about: Please report user behaviour and issues not relevant to the knockout plugin here.
   - name: Email
-    url: mailto:voyager006@outlook.com
-    about: Please report security vulnerabilities by email.
+    url: 
+    about: Please report security vulnerabilities by [email](mailto:voyager006@outlook.com?subject=[GitHub]%20GeryKnockout).
