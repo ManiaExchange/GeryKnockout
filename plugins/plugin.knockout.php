@@ -3408,15 +3408,6 @@ class KnockoutRuntime
                     {
                         $this->replaceNextTrackIfNeeded();
                     }
-                    // Put user selectable for KO'd and spectating players during podium
-                    if ($this->openWarmup)
-                    {
-                        $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
-                        if ($warmup['NextValue'] > 0)
-                        {
-                            $this->letKnockedOutPlayersPlay();
-                        }
-                    }
                     Log::debug(sprintf('setting points limit to %d', $this->maxRounds));
                     QueryManager::query('SetRoundPointsLimit', $this->maxRounds);
                 }
@@ -3436,15 +3427,6 @@ class KnockoutRuntime
                 UI::hideScoreboard();
                 if ($this->isPodium)
                 {
-                    // Put user selectable for KO'd and spectating players during podium
-                    if ($this->openWarmup)
-                    {
-                        $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
-                        if ($warmup['NextValue'] > 0)
-                        {
-                            $this->letKnockedOutPlayersPlay();
-                        }
-                    }
                     Log::debug(sprintf('setting points limit to %d', $this->maxRounds));
                     QueryManager::query('SetRoundPointsLimit', $this->maxRounds);
                 }
