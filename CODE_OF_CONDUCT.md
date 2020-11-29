@@ -6,7 +6,7 @@
 - Empower creators to share their content with others
 - Be a destination where everyone can compete for the fastest time
 - Challenge players by hosting friendly competitions
-- Most importantly, we’re all here to enjoy the game!
+- Most importantly, we're all here to enjoy the game!
 
 ## Suggestions
 
@@ -17,7 +17,7 @@ We strongly encourage the use of English in all public areas of ManiaExchange. T
 ## Rules
 
 **Content should be suitable for all ages**
-- No inappropriate content (including content shown when the map is played)
+- No inappropriate content
 - No foul language
 
 **Treat others with respect**
