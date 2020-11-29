@@ -28,7 +28,7 @@ Clone this repository to a folder of your choice. Using Visual Studio Code, [PHP
 ](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) is recommended. Using this setup, copy `tm_gery.php`, `includes\plugin_manager.php` and `includes\GbxRemote.php` from your TMGery installation to a new top level folder `dependencies`. Files in this folder are ignored by `.gitignore`, so you should see them grey out.
 
 ## Contribution
-You may contribute to this project by [reporting bugs](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose), [suggesting new features](https://github.com/ManiaExchange/GeryKnockout/issues/new/choose) or creating pull requests that addresses particular issues. Please consult [CONTRIBUTING.md](https://github.com/ManiaExchange/GeryKnockout/blob/main/CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](https://github.com/ManiaExchange/GeryKnockout/blob/main/CODE_OF_CONDUCT.md) if you plan to contribute on the coding part.
+You may contribute to this project by [reporting bugs](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=bug&template=bug_report.md&title=), [suggesting new features](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=new+feature&template=feature_request.md&title=) or creating pull requests that addresses particular issues. Please consult the [code of conduct](https://github.com/ManiaExchange/GeryKnockout/blob/main/CODE_OF_CONDUCT.md) before doing so.
 
 ## Screenshots
 ![In-game screenshot showing the status bar](docs/img/screenshot-status-bar-324p.png)
