@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: TrackMania Exchange Discord
+    url: https://discordapp.com/invite/Ttkw54Y
+    about: Discuss the TMX Knockout United event in the `#knockouts` channel.
+  - name: The TMX Admin & Mod Team
+    url: https://united.tm-exchange.com/?action=postupdate&id=contactus
+    about: Please report user behaviour and security vulnerabilities here.
