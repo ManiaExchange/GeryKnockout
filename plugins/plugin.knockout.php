@@ -1779,7 +1779,20 @@ class KOMultiplier
 
 
 /**
- * Tests if the given player has Tm-Gery HUD enabled.
+ * Tests if the given player is connected to the server.
+ *
+ * @param string $login The login of the player.
+ * @return bool True if the player is currently on the server.
+ */
+function isOnServer($login)
+{
+    global $PlayerScript;
+    return isset($PlayerScript[$login]);
+}
+
+
+/**
+ * Tests if the given player has Tm-Gery HUD enabled. If the player is not found, false is returned.
  *
  * @param string $login The login of the player.
  * @return bool True if HUD is shown for the player.
@@ -1790,27 +1803,6 @@ function hasHudOn($login)
     if (isset($PlayerScript[$login]))
     {
         return $PlayerScript[$login] === '1';
-    }
-    else
-    {
-        Log::warning(sprintf('Could not find player %s in PlayerScript', $login));
-        return false;
-    }
-}
-
-
-/**
- * Tests if the given player has Tm-Gery HUD disabled.
- *
- * @param string $login The login of the player.
- * @return bool True if HUD is not shown for the player.
- */
-function hasHudOff($login)
-{
-    global $PlayerScript;
-    if (isset($PlayerScript[$login]))
-    {
-        return $PlayerScript[$login] !== '1';
     }
     else
     {
@@ -2101,7 +2093,7 @@ class KnockoutRuntime
         $playersWithHudOff = array();
         if ($login !== null)
         {
-            if (hasHudOff($login))
+            if (!hasHudOn($login))
             {
                 $playersWithHudOff = array($this->playerList->get($login));
             }
@@ -2878,8 +2870,7 @@ class KnockoutRuntime
     }
 
     /**
-     * "Callback method" for when the synchronization phase (before each round)
-     * starts.
+     * "Callback method" for when the synchronization phase (before each round) starts.
      */
     public function onBeginSynchronization()
     {
@@ -2902,8 +2893,15 @@ class KnockoutRuntime
                     $optingPlayers = logins($this->playerList->filterByStatus(PlayerStatus::OptingOut));
                     foreach ($optingPlayers as $login)
                     {
-                        $this->playerList->setStatus($login, PlayerStatus::KnockedOutAndSpectating);
-                        $this->playerList->setLives($login, 0);
+                        if (isOnServer($login))
+                        {
+                            $this->playerList->setStatus($login, PlayerStatus::KnockedOutAndSpectating);
+                            $this->playerList->setLives($login, 0);
+                        }
+                        else
+                        {
+                            $this->playerList->remove($login);
+                        }
                     }
                 }
             }
@@ -3018,8 +3016,13 @@ class KnockoutRuntime
                     forceSpec(array($login), true);
                     break;
 
+                case PlayerStatus::OptingOut:
+                    forceSpec(array($login), true);
+                    break;
+
                 default:
                     Log::warning(sprintf('Player connected with status %s', $player['Status']));
+                    forceSpec(array($login), true);
                     break;
             }
         }
@@ -3083,6 +3086,10 @@ class KnockoutRuntime
             case PlayerStatus::KnockedOut:
             case PlayerStatus::KnockedOutAndSpectating:
                 $this->playerList->remove($login);
+                break;
+
+            case PlayerStatus::OptingOut:
+                // Do nothing
                 break;
 
             default:
