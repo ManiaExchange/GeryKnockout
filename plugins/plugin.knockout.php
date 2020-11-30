@@ -2835,15 +2835,13 @@ class KnockoutRuntime
                 break;
 
             case ServerStatus::Play:
-                if ($this->koStatus !== KnockoutStatus::Idle
-                    && $this->koStatus !== KnockoutStatus::Warmup
-                    && $this->koStatus !== KnockoutStatus::RestartingRound
-                    && $this->koStatus !== KnockoutStatus::RestartingTrack
-                    && $this->koStatus !== KnockoutStatus::SkippingWarmup
-                    && $this->koStatus !== KnockoutStatus::SkippingTrack)
+                if ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
                 {
-                    $this->shouldCheckForFalseStarts = true;
-                    $this->roundStartTime = microtime(true);
+                    if ($this->gameMode !== GameMode::Stunts && $this->gameMode !== GameMode::TimeAttack)
+                    {
+                        $this->shouldCheckForFalseStarts = true;
+                        $this->roundStartTime = microtime(true);
+                    }
                 }
                 break;
 
@@ -2961,17 +2959,14 @@ class KnockoutRuntime
     private function isEligibleToJoin() {
         if ($this->koStatus === KnockoutStatus::Starting || $this->koStatus === KnockoutStatus::StartingNow)
         {
-            // The knockout has not started yet
             return true;
         }
         elseif ($this->isWarmup && $this->roundNumber <= 1)
         {
-            // A player joins the first warmup
             return true;
         }
         elseif (($this->gameMode === GameMode::TimeAttack || $this->gameMode === GameMode::Stunts) && $this->roundNumber <= 1)
         {
-            // A player joins the first round in a Time Attack or Stunts KO
             return true;
         }
         else
@@ -3148,27 +3143,31 @@ class KnockoutRuntime
             case KnockoutStatus::Tiebreaker:
                 // Check if it's the first player to retire and whether a false start
                 // can be considered
-                $currentTime = microtime(true);
-                // Restart the round if we're in Rounds, the max count has not been reached and the
-                // player retired within 1 second of the start
                 if ($this->shouldCheckForFalseStarts
-                    && (in_array($this->gameMode, array(GameMode::Cup, GameMode::Laps, GameMode::Rounds, GameMode::Team), true))
                     && $timeOrScore === 0
-                    && $currentTime - $this->roundStartTime <= 1.
                     && $this->falseStartCount < $this->maxFalseStarts)
                 {
-                    // Must be a player in the KO who retires
-                    if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
+                    // Must be within 1 second of the start of the round
+                    $currentTime = microtime(true);
+                    if ($currentTime - $this->roundStartTime <= 1.)
                     {
-                        $this->koStatus = KnockoutStatus::RestartingRound;
-                        $this->falseStartCount++;
-                        QueryManager::query('ForceEndRound');
-                        Chat::info(sprintf(
-                            'False start! Restarting the round... (%d/%d)',
-                            $this->falseStartCount,
-                            $this->maxFalseStarts
-                        ));
-                        return;
+                        // Must be a player in the KO who retires
+                        if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
+                        {
+                            $this->koStatus = KnockoutStatus::RestartingRound;
+                            $this->falseStartCount++;
+                            QueryManager::query('ForceEndRound');
+                            Chat::info(sprintf(
+                                'False start! Restarting the round... (%d/%d)',
+                                $this->falseStartCount,
+                                $this->maxFalseStarts
+                            ));
+                            return;
+                        }
+                    }
+                    else
+                    {
+                        $this->shouldCheckForFalseStarts = false;
                     }
                 }
                 else
@@ -3201,19 +3200,6 @@ class KnockoutRuntime
                 }
                 break;
         }
-
-        // // For testing purposes
-        // if ($login === 'voyager006')
-        // {
-        //     if ($timeOrScore < 60000)
-        //     {
-        //         $this->onPlayerFinish(array('240', 'test1', 70000));
-        //     }
-        //     else
-        //     {
-        //         $this->onPlayerFinish(array('240', 'test1', $timeOrScore));
-        //     }
-        // }
     }
 
     /**
