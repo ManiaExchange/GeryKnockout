@@ -1566,26 +1566,33 @@ class KOMultiplier
      */
     public function getKOsThisRound($roundNumber, $numberOfPlayersLeft)
     {
-        switch ($this->mode)
+        if ($numberOfPlayersLeft <= 1)
         {
-            case self::None:
-                return 1;
-            case self::Constant:
-                return $this->value;
-            case self::Extra:
-                return (int) ceil($numberOfPlayersLeft / $this->value);
-            case self::Dynamic:
-                $func = $this->solveCurve($this->baseCurve(), $roundNumber, $this->value, $numberOfPlayersLeft, 1);
-                return $func($roundNumber);
-            case self::Tiebreaker:
-                return $this->value;
-            default:
-                Log::warning(
-                    'KO multiplier is in unknown state (%s, %d)',
-                    getNameOfConstant($this->mode, 'KOMultiplier'),
-                    $this->value
-                );
-                return null;
+            return 0;
+        }
+        else
+        {
+            switch ($this->mode)
+            {
+                case self::None:
+                    return 1;
+                case self::Constant:
+                    return $this->value;
+                case self::Extra:
+                    return (int) ceil($numberOfPlayersLeft / $this->value);
+                case self::Dynamic:
+                    $func = $this->solveCurve($this->baseCurve(), $roundNumber, $this->value, $numberOfPlayersLeft, 1);
+                    return $func($roundNumber);
+                case self::Tiebreaker:
+                    return $this->value;
+                default:
+                    Log::warning(
+                        'KO multiplier is in unknown state (%s, %d)',
+                        getNameOfConstant($this->mode, 'KOMultiplier'),
+                        $this->value
+                    );
+                    return null;
+            }
         }
     }
 
