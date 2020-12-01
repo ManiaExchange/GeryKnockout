@@ -1249,7 +1249,8 @@ class UI
             }
             else
             {
-                if ($timeOrScore >= 0) return $formatTime($timeOrScore);
+                if ($timeOrScore > 0) return $formatTime($timeOrScore);
+                elseif ($timeOrScore === Scores::HasNotFinishedYet) return '0:00.00';
                 elseif ($timeOrScore === Scores::DidNotFinish) return 'DNF';
                 else return '';
             }
@@ -3016,7 +3017,7 @@ class KnockoutRuntime
                     break;
 
                 default:
-                    Log::warning(sprintf('Player connected with status %s', $player['Status']));
+                    Log::warning(sprintf('Player connected with status %s', getNameOfConstant($player['Status'], 'PlayerStatus')));
                     forceSpec(array($login), true);
                     break;
             }
@@ -3088,7 +3089,7 @@ class KnockoutRuntime
                 break;
 
             default:
-                Log::warning(sprintf('Player disconnected with status %s', $player['Status']));
+                Log::warning(sprintf('Player disconnected with status %s', getNameOfConstant($player['Status'], 'PlayerStatus')));
                 break;
         }
     }

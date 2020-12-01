@@ -64,14 +64,22 @@ A full overview of the commands is listed in [cli.md](https://github.com/ManiaEx
 ## Features
 
 ### Allow knocked out players to play during warmup
-Players who have been knocked out are able to play during warmups if `/ko openwarmup` is enabled. This does not apply to spectators; if a player wants to be spectating instead, they can enter spectator mode during a warmup or a podium. Same thing applies the other way; if a spectator wants to play during warmups, leave spectator mode during a warmup or a podium. This also applies to shelved players during tiebreakers.
+Players who have been knocked out are able to play during warmups if open warmups are enabled. This does not apply to spectators; if a player wants to be spectating instead, they can enter spectator mode during a warmup. Same thing applies the other way; if a spectator wants to play during warmups, leave spectator mode during a warmup.
 
-The plugin does not put a password on the server during a knockout. If a player joins the server (spec as well), they'll be forced in if they are eligible. If not, their status will be `Knocked out` if they joined using *Play* and `Spectator` if they joined as a spectator. When the knockout is stopped, everyone is free to play unless a password is set manually.
+Use [/ko openwarmup](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-openwarmup-on--off) to set this functionality.
 
-Likewise, if someone disconnects during a knockout, they will be eligible to join if they are not knocked out yet. If there is a disconnection during the warmup, they may rejoin until the next live round has ended.
+### Force players in after disconnecting
+
+Players may be able to be automatically put back in the knockout if they disconnected but rejoin in time. This is valid as long as the given player is not knocked out yet. If there is a disconnection during the warmup, they may rejoin until the next live round has ended.
+
+Currently, players are knocked out at the end of each round; which means that a player may reconnect during a live round and attempt to finish.
+
+If a player joins the server, they'll be forced in if they are eligible. If not, their status will be `Knocked out` if they joined using *Play* and `Spectating` if they joined as a spectator. The plugin does not put a password on the server during a knockout. When the knockout is stopped, everyone is free to play unless a password is set manually.
+
+Likewise, if someone disconnects during a knockout, they will be eligible to join
 
 ### Tiebreakers
-When a round ends and there is a tie among players who risk getting knocked out and players who don't, there is an ambiguity as of who shall be knocked out. When this happens, the script will enter a custom tiebreaker mode. The current round will be restarted with the tied players only, while surviving players are temporarily put to spec (shelved). Once the tiebreaker ends, the knockout resumes as normal on the next round.
+When a round ends and there is a tie among players who risk getting knocked out and players who don't, there is an ambiguity as of who shall be knocked out. If tiebreakers are enabled, the script will enter a custom tiebreaker mode when this happens. The current round will be restarted with the tied players only, while surviving players are temporarily put to spec (shelved). Once the tiebreaker ends, the knockout resumes as normal on the next round.
 
 As an example, imagine the following standings in a round with 1 KO:
 
