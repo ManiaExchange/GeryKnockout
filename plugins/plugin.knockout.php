@@ -367,17 +367,11 @@ class QueryManager
      * Adds a client query to memory.
      *
      * @param string $methodName The method name of the query.
-     * @param mixed $arg1 [Optional] The first argument for the specified query.
-     * @param mixed $arg2 [Optional] The second argument for the specified query.
-     * @param mixed $arg3 [Optional] The third argument for the specified query.
-     * @param mixed $arg4 [Optional] The fourth argument for the specified query.
+     * @param array ...$args [Optional] The arguments for the specified query.
      */
-    public function add($methodName, $arg1 = null, $arg2 = null, $arg3 = null, $arg4 = null)
+    public function add($methodName, $args = null)
     {
-        $args = array_filter(
-            array($arg1, $arg2, $arg3, $arg4),
-            function($arg) { return !is_null($arg); }
-        );
+        $args = array_slice(func_get_args(), 1);
         $this->multicall[] = array(
             'methodName' => $methodName,
             'params' => $args
@@ -406,23 +400,15 @@ class QueryManager
      * Queries the client.
      *
      * @param string $methodName The method name of the query.
-     * @param mixed $arg1 [Optional] The first argument for the specified query.
-     * @param mixed $arg2 [Optional] The second argument for the specified query.
-     * @param mixed $arg3 [Optional] The third argument for the specified query.
-     * @param mixed $arg4 [Optional] The fourth argument for the specified query.
+     * @param array ...$args [Optional] The arguments for the specified query.
      *
      * @return bool True if the query was successfully handled, false if an error occurred.
      */
-    public static function query($methodName, $arg1 = null, $arg2 = null, $arg3 = null, $arg4 = null)
+    public static function query($methodName, $args = null)
     {
         global $client;
 
-        $success = false;
-        if (is_null($arg1)) $success = $client->query($methodName);
-        elseif (is_null($arg2)) $success = $client->query($methodName, $arg1);
-        elseif (is_null($arg3)) $success = $client->query($methodName, $arg1, $arg2);
-        elseif (is_null($arg4)) $success = $client->query($methodName, $arg1, $arg2, $arg3);
-        else $success = $client->query($methodName, $arg1, $arg2, $arg3, $arg4);
+        $success = call_user_func_array(array($client, 'query'), func_get_args());
         if (!$success) self::handleError($methodName);
         return $success;
     }
@@ -431,24 +417,16 @@ class QueryManager
      * Queries the client and returns its response.
      *
      * @param string $methodName The method name of the query.
-     * @param mixed $arg1 [Optional] The first argument for the specified query.
-     * @param mixed $arg2 [Optional] The second argument for the specified query.
-     * @param mixed $arg3 [Optional] The third argument for the specified query.
-     * @param mixed $arg4 [Optional] The fourth argument for the specified query.
+     * @param array ...$args [Optional] The arguments for the specified query.
      *
-     * @return mixed|bool The response from the client if the query was successfully handled, false
+     * @return mixed|false The response from the client if the query was successfully handled, false
      * if an error occurred.
      */
-    public static function queryWithResponse($methodName, $arg1 = null, $arg2 = null, $arg3 = null, $arg4 = null)
+    public static function queryWithResponse($methodName, $args = null)
     {
         global $client;
 
-        $success = false;
-        if (is_null($arg1)) $success = $client->query($methodName);
-        elseif (is_null($arg2)) $success = $client->query($methodName, $arg1);
-        elseif (is_null($arg3)) $success = $client->query($methodName, $arg1, $arg2);
-        elseif (is_null($arg4)) $success = $client->query($methodName, $arg1, $arg2, $arg3);
-        else $success = $client->query($methodName, $arg1, $arg2, $arg3, $arg4);
+        $success = call_user_func_array(array($client, 'query'), func_get_args());
         if (!$success)
         {
             self::handleError($methodName);
