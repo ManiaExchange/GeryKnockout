@@ -3007,13 +3007,23 @@ class KnockoutRuntime
         {
             $player = $this->playerList->get($login);
             $this->playerList->setNickname($login, $playerInfo['NickName']);
+            $logUnexpectedStatus = function() use($player)
+            {
+                Log::warning(sprintf('Player connected with status %s', getNameOfConstant($player['Status'], 'PlayerStatus')));
+            };
             switch ($player['Status'])
             {
+                case PlayerStatus::Playing:
+                    $logUnexpectedStatus();
+                    // Flow into next case
                 case PlayerStatus::PlayingAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Playing);
                     forcePlay(array($login), true);
                     break;
 
+                case PlayerStatus::Shelved:
+                    $logUnexpectedStatus();
+                    // Flow into next case
                 case PlayerStatus::ShelvedAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Shelved);
                     forceSpec(array($login), true);
@@ -3024,7 +3034,7 @@ class KnockoutRuntime
                     break;
 
                 default:
-                    Log::warning(sprintf('Player connected with status %s', getNameOfConstant($player['Status'], 'PlayerStatus')));
+                    $logUnexpectedStatus();
                     forceSpec(array($login), true);
                     break;
             }
