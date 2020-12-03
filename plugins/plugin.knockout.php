@@ -3238,6 +3238,7 @@ class KnockoutRuntime
                     break;
 
                 case PlayerStatus::Shelved:
+                case PlayerStatus::OptingOut:
                     break;
 
                 default:
@@ -4567,7 +4568,7 @@ class KnockoutRuntime
         {
             if ($this->koStatus === KnockoutStatus::Idle)
             {
-                $msg = "You can not opt in to a knockout if it's not running";
+                $msg = "You can't opt in to a knockout if it's not running";
                 Chat::error($msg, array($issuerLogin));
             }
             else
@@ -4575,15 +4576,10 @@ class KnockoutRuntime
                 $playerObj = $this->playerList->get($issuerLogin);
                 if (PlayerStatus::isIn($playerObj['Status']) || PlayerStatus::isShelved($playerObj['Status']))
                 {
-                    $msg = "You can not opt in to a knockout you're already participating in";
+                    $msg = "You are already participating in this knockout";
                     Chat::error($msg, array($issuerLogin));
                 }
-                elseif (PlayerStatus::isOut($playerObj['Status']))
-                {
-                    $msg = "You can not opt in to a knockout you're been knocked out of";
-                    Chat::error($msg, array($issuerLogin));
-                }
-                else
+                elseif ($playerObj['Status'] === PlayerStatus::OptingOut)
                 {
                     if ($this->koStatus === KnockoutStatus::Tiebreaker)
                     {
@@ -4598,13 +4594,18 @@ class KnockoutRuntime
                     $this->onKoStatusUpdate();
                     Chat::info(sprintf('%s$z$s$g has opted in to the knockout', $playerObj['NickName']));
                 }
+                else
+                {
+                    $msg = "You can no longer opt in to this knockout";
+                    Chat::error($msg, array($issuerLogin));
+                }
             }
         }
         elseif (strtolower($args[0]) === 'out')
         {
             if ($this->koStatus === KnockoutStatus::Idle)
             {
-                $msg = "You can not opt out of a knockout if it's not running";
+                $msg = "You can't opt out of a knockout if it's not running";
                 Chat::error($msg, array($issuerLogin));
             }
             {
@@ -4616,7 +4617,7 @@ class KnockoutRuntime
                 }
                 else
                 {
-                    $msg = "You can not opt out of a knockout you're not participating in";
+                    $msg = "You are not participating in this knockout";
                     Chat::error($msg, array($issuerLogin));
                 }
             }
