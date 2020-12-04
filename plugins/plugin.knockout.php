@@ -1953,7 +1953,7 @@ class KnockoutRuntime
 
     // Defaults
     private $defaultVoteTimeout = 60;
-    private $defaultPointPartition = $RoundCustomPoints === 1 ? $CustomPoints : array(10, 8, 7, 6, 5, 4, 3, 2, 1);
+    private $defaultPointPartition = array(10, 8, 7, 6, 5, 4, 3, 2, 1);
     private $authorSkipLimit = 10;
 
     // Settings
@@ -1994,6 +1994,8 @@ class KnockoutRuntime
     public function onControllerStartup()
     {
         global $PlayerList;
+        global $RoundCustomPoints;
+        global $CustomPoints;
 
         $this->isWarmup = QueryManager::queryWithResponse('GetWarmUp');
         $status = QueryManager::queryWithResponse('GetStatus');
@@ -2005,7 +2007,10 @@ class KnockoutRuntime
         UI::restoreDefaultScoreboard();
         forcePlay(logins($PlayerList), false);
         QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
-        QueryManager::query('SetRoundCustomPoints', $this->defaultPointPartition);
+        if ($RoundCustomPoints === 1)
+        {
+            $this->defaultPointPartition = $CustomPoints;
+        }
 
         Chat::info(sprintf('Knockout plugin $fff%s$g loaded', Version));
     }
@@ -2185,7 +2190,8 @@ class KnockoutRuntime
         //     array_fill(0, $numberOfSurvivors, 1),
         //     array_fill(0, $playerCount - $numberOfSurvivors, 0)
         // );
-        $scoresPartition = array($value);
+        // Needs to have at least two elements
+        $scoresPartition = array($value, $value);
         QueryManager::query('SetRoundCustomPoints', $scoresPartition);
     }
 
