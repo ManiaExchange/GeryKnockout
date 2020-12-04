@@ -9,7 +9,7 @@ This repository contains a plugin for TMGery that enables knockout competitions 
 ## Prerequisites
 - Trackmania dedicated server
 - PHP 5.3 or later
-- TMGery v34 or later
+- TMGery v2020-12-04 or later
 - DedDerek's plugin manager 0.23 or later
 
 ## Installation
