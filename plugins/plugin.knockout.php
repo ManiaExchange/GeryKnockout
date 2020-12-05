@@ -6,7 +6,7 @@
  */
 
 const Version = '2.0.0 (beta)';
-const MinimumLogLevel = Log::Debug;
+const MinimumLogLevel = Log::Information;
 
 
 /*
@@ -3261,7 +3261,6 @@ class KnockoutRuntime
                 $noOneFinished = true;
                 foreach ($scores as $score)
                 {
-                    print_r($score);
                     if ($score['Score'] > 0)
                     {
                         $noOneFinished = false;
@@ -3517,7 +3516,7 @@ class KnockoutRuntime
                     {
                         $onError('Syntax error: too many arguments ($fff%s$g, expected $fff/ko start$g or $fff/ko start now$g)');
                     }
-                    elseif (is_null($args[1]) || strtolower($args[1]) === 'now')
+                    elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
                     {
                         // Todo: look up on next round's infos with GetNextGameInfo
                         $mode = QueryManager::queryWithResponse('GetGameMode');
@@ -3539,7 +3538,7 @@ class KnockoutRuntime
                         //     return;
                         // }
 
-                        $this->start($players, $args[1] === 'now');
+                        $this->start($players, isset($args[1]) && $args[1] === 'now');
                         Chat::info2('Knockout starting with the following settings:', array($issuerLogin));
                         Chat::info2($this->printSettings(), array($issuerLogin));
                     }
@@ -3578,7 +3577,7 @@ class KnockoutRuntime
                     {
                         $onError('Syntax error: too many arguments (usage: $fff/ko skip$g or $fff/ko skip warmup$g)');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         if ($this->koStatus === KnockoutStatus::Tiebreaker)
                         {
@@ -3625,7 +3624,7 @@ class KnockoutRuntime
                     {
                         $onError('Syntax error: too many arguments (usage: $fff/ko restart$g or $fff/ko restart warmup$g)');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
                         {
@@ -3668,7 +3667,7 @@ class KnockoutRuntime
                     {
                         $onError('The knockout must be running before this command can be used');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko add (<login> | *)$g)');
                     }
@@ -3731,7 +3730,7 @@ class KnockoutRuntime
                     {
                         $onError('The knockout must be running before this command can be used');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko remove (<login> | *)$g)');
                     }
@@ -3821,7 +3820,7 @@ class KnockoutRuntime
 
                 // /ko lives (<login> | *) [[+ | -]<lives>]
                 case 'lives':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko lives (<login> | *) [[+ | -]<lives>]$g)');
                     }
@@ -3851,7 +3850,7 @@ class KnockoutRuntime
                             return;
                         }
 
-                        if (is_null($args[2]))
+                        if (!isset($args[2]))
                         {
                             // Display
                             if ($this->koStatus === KnockoutStatus::Idle)
@@ -3955,7 +3954,7 @@ class KnockoutRuntime
                                 break;
 
                             case 'constant':
-                                if (is_null($args[2]))
+                                if (!isset($args[2]))
                                 {
                                     $onError('Syntax error: expected an argument (usage: $fff/ko multi constant <x KOs per round>$g)');
                                 }
@@ -3988,7 +3987,7 @@ class KnockoutRuntime
                                 break;
 
                             case 'extra':
-                                if (is_null($args[2]))
+                                if (!isset($args[2]))
                                 {
                                     $onError('Syntax error: expected an argument (usage: $fff/ko multi extra <per X players>$g)');
                                 }
@@ -4021,7 +4020,7 @@ class KnockoutRuntime
                                 break;
 
                             case 'dynamic':
-                                if (is_null($args[2]))
+                                if (!isset($args[2]))
                                 {
                                     $onError('Syntax error: expected an argument (usage: $fff/ko multi dynamic <X rounds>$g)');
                                 }
@@ -4054,7 +4053,7 @@ class KnockoutRuntime
                                 break;
 
                             default:
-                                if (!is_null($args[1]))
+                                if (isset($args[1]))
                                 {
                                     $onError(sprintf('Syntax error: unexpected argument $fff%s$g (expected $fffconstant$g, $fffextra$g or $fffnone$g)', $args[1]));
                                 }
@@ -4069,7 +4068,7 @@ class KnockoutRuntime
 
                 // /ko openwarmup (on | off)
                 case 'openwarmup':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko openwarmup (on | off)$g)');
                     }
@@ -4097,7 +4096,7 @@ class KnockoutRuntime
 
                 // /ko falsestart <max_tries>
                 case 'falsestart':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko falsestart <max tries>$g)');
                     }
@@ -4134,7 +4133,7 @@ class KnockoutRuntime
 
                 // /ko tiebreaker (on | off)
                 case 'tiebreaker':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko tiebreaker (on | off)>$g)');
                     }
@@ -4160,7 +4159,7 @@ class KnockoutRuntime
 
                 // /ko authorskip <for_top_x_players>
                 case 'authorskip':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko authorskip <for top X players>$g)');
                     }
@@ -4343,22 +4342,19 @@ class KnockoutRuntime
 
                     implode($sep2, array(
                         "/ko falsestart {$var}max_tries{$endvar}",
-                        'Sets the limit for how many times the round will be restarted if someone retires before the countdown.'
+                        'Sets the limit for how many times the round will be restarted if someone retires before the',
+                        'countdown.'
                     )),
 
                     implode($sep2, array(
                         "/ko tiebreaker (on | off)",
-                        'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and at not all of them would be knocked out.'
+                        'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and not',
+                        'all of them would be knocked out.'
                     )),
 
                     implode($sep2, array(
                         "/ko authorskip {$var}for_top_x_players{$endvar}",
                         'Automatically skips a track when its author is present, once a given player count has been reached.'
-                    )),
-
-                    implode($sep2, array(
-                        "/ko settings",
-                        'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
                     ))
                 ));
                 UI::showMultiPageDialog("{$prefix}{$text}", $logins, 2, $totalPages, 461, 463);
@@ -4366,6 +4362,11 @@ class KnockoutRuntime
 
             case 3:
                 $text = implode($sep1, array(
+                    implode($sep2, array(
+                        "/ko settings",
+                        'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
+                    )),
+
                     implode($sep2, array(
                         "/ko status",
                         'Shows knockout mode, knockout status, player list and scores in a dialog window.'
@@ -4376,7 +4377,9 @@ class KnockoutRuntime
                         'Shows the list of commands.'
                     )),
 
-                    '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l'
+                    '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l',
+
+                    '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md]User guide$l'
                 ));
                 UI::showMultiPageDialog("{$prefix}{$text}", $logins, 3, $totalPages, 462, null);
                 break;
