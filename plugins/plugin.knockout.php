@@ -2178,20 +2178,17 @@ class KnockoutRuntime
      *
      * Changing game settings has immediate effect as long as they are changed
      * by the start of the round.
-     *
-     * @param int $value The number of points to reward to each player.
      */
-    private function adjustPoints($value)
+    private function adjustPoints()
     {
-        // $playerCount = count($this->playerList->getPlaying());
-        // $nbKOs = $this->kosThisRound;
-        // $numberOfSurvivors = $playerCount <= 1 ? 1 : $playerCount - $nbKOs;
-        // $scoresPartition = array_merge(
-        //     array_fill(0, $numberOfSurvivors, 1),
-        //     array_fill(0, $playerCount - $numberOfSurvivors, 0)
-        // );
+        $playerCount = count($this->playerList->getPlaying());
+        $nbKOs = $this->kosThisRound;
+        $numberOfSurvivors = $playerCount <= 1 ? 1 : $playerCount - $nbKOs;
+        $scoresPartition = array_merge(
+            array_fill(0, $numberOfSurvivors, 1),
+            array(0)
+        );
         // Needs to have at least two elements
-        $scoresPartition = array($value, $value);
         QueryManager::query('SetRoundCustomPoints', $scoresPartition);
     }
 
@@ -2206,7 +2203,6 @@ class KnockoutRuntime
         QueryManager::query('SetCallVoteTimeOut', 0);
         $this->playerList->addAll($players, PlayerStatus::Playing, $this->lives);
         forcePlay(logins($this->playerList->getAll()), true);
-        $this->adjustPoints(1);
         if ($now)
         {
             $this->koStatus = KnockoutStatus::StartingNow; // Will be set to Running in onEndRound
@@ -2633,7 +2629,6 @@ class KnockoutRuntime
         $this->koStatus = KnockoutStatus::Tiebreaker;
         $this->updateKoCount();
         $this->updateStatusBar();
-        // $this->adjustPoints(0);
     }
 
     /**
@@ -2647,7 +2642,6 @@ class KnockoutRuntime
         $this->koMultiplier->revert();
         forcePlay(logins($remainingPlayers), true);
         $this->koStatus = KnockoutStatus::Running;
-        // $this->adjustPoints(1);
     }
 
     /**
@@ -2868,6 +2862,7 @@ class KnockoutRuntime
             $this->announceRoundInChat();
             $this->updateKoCount();
             $this->updateStatusBar();
+            $this->adjustPoints();
         }
     }
 
@@ -3240,25 +3235,25 @@ class KnockoutRuntime
         switch ($this->koStatus)
         {
             case KnockoutStatus::Idle:
-                return;
+                break;
 
             case KnockoutStatus::RestartingRound:
             case KnockoutStatus::RestartingTrack:
             case KnockoutStatus::SkippingTrack:
                 $this->roundNumber--;
-                return;
+                break;
 
             case KnockoutStatus::Starting:
             case KnockoutStatus::StartingNow:
                 Chat::announce('Knockout starting!');
                 $this->hudReminder();
                 $this->koStatus = KnockoutStatus::Running;
-                return;
+                break;
 
             case KnockoutStatus::Warmup:
             case KnockoutStatus::SkippingWarmup:
                 $this->roundNumber--;
-                return;
+                break;
 
             case KnockoutStatus::Running:
             case KnockoutStatus::Tiebreaker:
@@ -3341,7 +3336,7 @@ class KnockoutRuntime
                         }
                     }
                 }
-                return;
+                break;
         }
     }
 
@@ -4552,8 +4547,11 @@ class KnockoutRuntime
     {
         if (isadmin($issuer[0]))
         {
-            $scoresPartition = array(1);
-            QueryManager::query('SetRoundCustomPoints', $scoresPartition);
+            $this->onPlayerConnect(array(
+                'somerandomdude',
+                false
+            ));
+            Chat::info2('test1 done', array($issuer[0]));
         }
         else
         {
@@ -4574,8 +4572,12 @@ class KnockoutRuntime
     {
         if (isadmin($issuer[0]))
         {
-            $scoresPartition = array(0);
-            QueryManager::query('SetRoundCustomPoints', $scoresPartition);
+            $chattime = QueryManager::queryWithResponse('GetChatTime');
+            QueryManager::query('SetChatTime', 0);
+            QueryManager::query('SetGameMode', GameMode::Rounds);
+            QueryManager::query('SetWarmUp', false);
+            QueryManager::query('NextChallenge');
+            QueryManager::query('SetChatTime', $chattime['NextValue']);
         }
         else
         {
@@ -4596,8 +4598,8 @@ class KnockoutRuntime
     {
         if (isadmin($issuer[0]))
         {
-            $scoresPartition = array(1, 0);
-            QueryManager::query('SetRoundCustomPoints', $scoresPartition);
+            $scoresPartition = array(-1, -2);
+            QueryManager::query('SetRoundCustomPoints', $scoresPartition, true);
         }
         else
         {

@@ -153,7 +153,7 @@ When a player gets last, they will lose a life. If it was their last life, they 
 The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). The number of lives may be relative (by using a + or - sign in front of the number) or absolute.
 
 ### Rounds per track
-If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. The plugin overrides the current points partition with a custom one where each finisher gets 1 point.
+If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0.
 
 Note: it is recommended to disable tiebreakers and use 1 life for each player to avoid unwanted side effects.
 
