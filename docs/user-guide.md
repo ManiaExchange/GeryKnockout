@@ -49,7 +49,6 @@ During the knockout, the following commands may be used:
 The knockout can be further customized by the following settings:
 
 - [/ko multi (constant *kos* | extra *per_x_players* | dynamic *total_rounds* | none)](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) - perform multiple KOs per round
-- [/ko rounds *rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-rounds-rounds) - sets the number of rounds per track (Rounds only)
 - [/ko openwarmup (on | off)](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-openwarmup-on--off) - lets players drive during warmups
 - [/ko falsestart *max_tries*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-falsestart-max_tries) - sets the limit for how many times a round is restarted because of someone retiring before it starts
 - [/ko tiebreaker (on | off)](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off) - use a custom tiebreaker mode in case of ties
@@ -113,6 +112,8 @@ Tiebreakers will not initiate if the tied players DNF.
 
 This mode can be disabled using [/ko tiebreaker](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off). If disabled, ties are broken by when they were submitted; times which are set earlier are preferred.
 
+It is recommended to disable this mode if you intend to [play several rounds per track](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md#rounds-per-track).
+
 ### KO multiplier
 You can control how many KOs are performed each round by using a KO multiplier; useful if there are many players and limited time. These are the following multipliers that may be used:
 
@@ -152,12 +153,12 @@ When a player gets last, they will lose a life. If it was their last life, they 
 The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). The number of lives may be relative (by using a + or - sign in front of the number) or absolute.
 
 ### Rounds per track
-In Rounds, the number of rounds to be played per track is enforced by using [/ko rounds *rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-rounds-rounds). The default is 1, which means 1 round will be played on each track.
+If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0.
 
-In order to do this, the plugin enforces a custom points partition. Every surviving player is given 1 point, and knocked out players are given 0. The points limit can therefore be used to determine the number of rounds per track. This overrides the server's current points partition.
+Note: it is recommended to disable tiebreakers and use 1 life for each player to avoid unwanted side effects.
 
 ### False starts
-The plugin includes false start detection, as TMGery does not provide this natively. If someone retires before the race starts, the round will be restarted. This is limited to two times per round, but can be adjusted or disabled using [/ko falsestart *max_tries*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-falsestart-max_tries).
+The plugin includes false start detection, as TMGery does not provide this natively. If someone retires before the race starts, the round will be restarted. This is limited to two times per round by default, but can be adjusted or disabled using [/ko falsestart *max_tries*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-falsestart-max_tries).
 
 ### Automatic skip of author tracks
 When proceeding to the next track, and with few players in the knockout, the script will skip the next track if the author is still in. This is to prevent excessive advantage by playing their own tracks in the final rounds. When and if this should kick in is determined by [/ko authorskip *for_top_x_players*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-authorskip-for_top_x_players); the default is to be enabled for top 7, but can be disabled by setting to 0.
@@ -234,7 +235,6 @@ New admin commands:
 
 - /ko spec (*login* | \*)
 - /ko lives (*login* | \*) [[+ | -]*lives*]
-- /ko rounds *rounds*
 - /ko openwarmup (on | off)
 - /ko falsestart *max_tries*
 - /ko tiebreaker (on | off)
@@ -272,6 +272,4 @@ The following bugs have been fixed since v.082.9:
 `/restart`, `/gonext` and `/end` can be used interchangeably with `/ko restart`, `/ko skip` and `/ko skip warmup` respectively, as long as no one has finished yet. Though, the new commands offer new functionality such as restarting the current track with a warmup (using `/ko restart warmup`), protection against unwanted KOs if someone have finished, and proper state management (status is reflected in the top bar).
 
 ## Known issues
-There may be extra waiting time before each round. This may be due to the fact that players are forced in to play warmups, but someone may be "stuck" in an intro. Use `/ko spec <login>` to force them to always spec; hopefully this will help.
-
-Other issues are listed in [Issues](https://github.com/ManiaExchange/GeryKnockout/issues).
+[This list](https://github.com/ManiaExchange/GeryKnockout/issues?q=is%3Aissue+is%3Aopen+label%3Abug) shows currently known bugs.

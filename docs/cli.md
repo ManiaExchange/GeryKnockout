@@ -69,19 +69,12 @@ Default: 1
 Sets the KO multiplier mode:
 - Constant: `x` KOs per round.
 - Extra: +1 KO for every `x`'th player, such that if `x` = 10 then there will be 1 KO for 2-10 players, 2 KOs for 11-20, 3 KOs for 21-30, and so on.
-- Dynamic: Aims for a total amount of `x` rounds. Starts off with 1 KO, progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds. 
+- Dynamic: Aims for a total amount of `x` rounds. Starts off with 1 KO, progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds.
 - None: 1 KO per round.
 
 Note: adjusting the multiplier is not possible during a tiebreaker.
 
 Default: None
-
-### /ko rounds *rounds*
-Sets the number of rounds per track to play in Rounds. If it's the last round, the change will take effect on the next track. 
-
-Note: issuing this command will not enforce Rounds game mode to be played.
-
-Default: 1
 
 ### /ko openwarmup (on | off)
 Enables or disables open warmup which lets knocked out players play during warmup.

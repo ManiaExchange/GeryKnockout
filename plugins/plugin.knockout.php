@@ -6,7 +6,7 @@
  */
 
 const Version = '2.0.0 (beta)';
-const MinimumLogLevel = Log::Debug;
+const MinimumLogLevel = Log::Information;
 
 
 /*
@@ -160,7 +160,6 @@ class KnockoutStatus
     const SkippingWarmup = 28;
     const SkippingTrack = 29;
     const Tiebreaker = 30;
-    const Stopping = 31;
 
     /**
      * Returns true if the knockout has started.
@@ -1954,7 +1953,6 @@ class KnockoutRuntime
 
     // Defaults
     private $defaultVoteTimeout = 60;
-    private $defaultPointsLimit = 10;
     private $defaultPointPartition = array(10, 8, 7, 6, 5, 4, 3, 2, 1);
     private $authorSkipLimit = 10;
 
@@ -1964,7 +1962,6 @@ class KnockoutRuntime
     private $openWarmup;
     private $tiebreaker;
     private $maxFalseStarts;
-    private $maxRounds;
     private $authorSkip;
 
     public function __construct()
@@ -1988,7 +1985,6 @@ class KnockoutRuntime
         $this->openWarmup = true;
         $this->tiebreaker = true;
         $this->maxFalseStarts = 2;
-        $this->maxRounds = 1;
         $this->authorSkip = 7;
     }
 
@@ -1998,6 +1994,8 @@ class KnockoutRuntime
     public function onControllerStartup()
     {
         global $PlayerList;
+        global $RoundCustomPoints;
+        global $CustomPoints;
 
         $this->isWarmup = QueryManager::queryWithResponse('GetWarmUp');
         $status = QueryManager::queryWithResponse('GetStatus');
@@ -2009,8 +2007,10 @@ class KnockoutRuntime
         UI::restoreDefaultScoreboard();
         forcePlay(logins($PlayerList), false);
         QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
-        QueryManager::query('SetRoundCustomPoints', $this->defaultPointPartition);
-        QueryManager::query('SetRoundPointsLimit', $this->defaultPointsLimit);
+        if ($RoundCustomPoints === 1)
+        {
+            $this->defaultPointPartition = $CustomPoints;
+        }
 
         Chat::info(sprintf('Knockout plugin $fff%s$g loaded', Version));
     }
@@ -2139,7 +2139,6 @@ class KnockoutRuntime
                 case KnockoutStatus::SkippingWarmup:
                 case KnockoutStatus::Starting:
                 case KnockoutStatus::StartingNow:
-                case KnockoutStatus::Stopping:
                     break;
                 default:
                     Log::warning(sprintf(
@@ -2174,6 +2173,26 @@ class KnockoutRuntime
     }
 
     /**
+     * Adjusts the points partition by awarding each finishing player with the
+     * given value.
+     *
+     * Changing game settings has immediate effect as long as they are changed
+     * by the start of the round.
+     */
+    private function adjustPoints()
+    {
+        $playerCount = count($this->playerList->getPlaying());
+        $nbKOs = $this->kosThisRound;
+        $numberOfSurvivors = $playerCount <= 1 ? 1 : $playerCount - $nbKOs;
+        $scoresPartition = array_merge(
+            array_fill(0, $numberOfSurvivors, 1),
+            array(0)
+        );
+        // Needs to have at least two elements
+        QueryManager::query('SetRoundCustomPoints', $scoresPartition);
+    }
+
+    /**
      * Starts the knockout.
      *
      * @param array $players  Players to start with (result of GetPlayerList query)
@@ -2182,10 +2201,6 @@ class KnockoutRuntime
     private function start($players, $now = false)
     {
         QueryManager::query('SetCallVoteTimeOut', 0);
-        $points = QueryManager::queryWithResponse('GetRoundPointsLimit');
-        $this->defaultPointsLimit = $points['NextValue'];
-        Log::debug(sprintf('setting points limit to %d', $this->maxRounds));
-        QueryManager::query('SetRoundPointsLimit', $this->maxRounds);
         $this->playerList->addAll($players, PlayerStatus::Playing, $this->lives);
         forcePlay(logins($this->playerList->getAll()), true);
         if ($now)
@@ -2228,9 +2243,6 @@ class KnockoutRuntime
         $this->scores->reset();
         QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
         QueryManager::query('SetRoundCustomPoints', $this->defaultPointPartition);
-        // Todo: set round points limit later (can't be done now)
-        Log::debug(sprintf('setting points limit to %d', $this->defaultPointsLimit));
-        QueryManager::query('SetRoundPointsLimit', $this->defaultPointsLimit);
         $this->koStatus = KnockoutStatus::Idle;
     }
 
@@ -2686,15 +2698,8 @@ class KnockoutRuntime
         //   - If round 1+, restarts challenge from round 0
         //   - If game mode settings have been changed, restarts challenge with warmups if any
         // - 'ForceEndRound':
-        //   - If no one have scored: restarts round
+        //   - If no one have finished: restarts round
         //   - If someone have finished: completes the round and starts the next one
-        //
-        // In addition, If the rounds point limit won't be reached, the end result of
-        // 'RestartChallenge' is unpredictable by the time we get here (most likely won't be able to
-        // issue it due to error -1000). The current workaround is to modify the points limit to
-        // accomodate the change:
-        // - If it is the last round, restart the challenge with one round left
-        // - Otherwise, force end of the round while incrementing the points limit
         switch ($this->gameMode)
         {
             case GameMode::Laps:
@@ -2714,23 +2719,9 @@ class KnockoutRuntime
                 $scores = $this->scores->getSortedScores();
                 if (isset($scores[0]) && $scores[0]['Score'] > 0)
                 {
-                    // Someone have finished; need to adjust points limit
-                    $pointsLimit = QueryManager::queryWithResponse('GetRoundPointsLimit');
-                    // Get points of the match
-                    $leader = $this->getLeadingPlayer();
-                    $isLastRound = is_null($leader) ? false : $pointsLimit['CurrentValue'] <= $leader['Score'] + 1;
-                    if ($isLastRound)
-                    {
-                        Log::debug('setting points limit to 1');
-                        QueryManager::query('SetRoundPointsLimit', 1);
-                        QueryManager::query('RestartChallenge');
-                    }
-                    else
-                    {
-                        Log::debug(sprintf('setting points limit to %d', $pointsLimit['CurrentValue'] + 1));
-                        QueryManager::query('SetRoundPointsLimit', $pointsLimit['CurrentValue'] + 1);
-                        QueryManager::query('ForceEndRound');
-                    }
+                    // If someone have finished, the only way to restart the
+                    // round is to start from round 1
+                    QueryManager::query('RestartChallenge');
                 }
                 else
                 {
@@ -2745,36 +2736,15 @@ class KnockoutRuntime
      */
     private function restartTrack()
     {
-        // Changing some setting that takes effect on next challenge (like setting a new game mode)
-        // makes RestartChallenge restart the whole challenge, including warmup
+        // Changing some setting that takes effect on next challenge (like
+        // setting a new game mode) makes RestartChallenge restart the whole
+        // challenge, including warmup
         $chattime = QueryManager::queryWithResponse('GetChatTime');
         QueryManager::query('SetChatTime', 0);
         QueryManager::query('SetGameMode', GameMode::Team);
         QueryManager::query('SetGameMode', $this->gameMode);
         QueryManager::query('RestartChallenge');
         QueryManager::query('SetChatTime', $chattime['NextValue']);
-    }
-
-    /**
-     * Adjusts the points partition and the round points limit.
-     */
-    private function adjustPoints()
-    {
-        $playerCount = count($this->playerList->getPlayingOrShelved());
-        $nbKOs = $this->kosThisRound;
-        // Changing game settings has immediate effect as long as you change them by the start of
-        // the round
-        if ($playerCount - $nbKOs <= 1 && $this->gameMode === GameMode::Rounds)
-        {
-            // Adjust the points limit such that this is the last round
-            $leader = $this->getLeadingPlayer();
-            $maxScore = is_null($leader) ? 0 : $leader['Score'];
-            Log::debug(sprintf('setting points limit to %d', $maxScore + 1));
-            QueryManager::query('SetRoundPointsLimit', $maxScore + 1);
-        }
-        $numberOfSurvivors = $playerCount <= 1 ? 1 : $playerCount - $nbKOs;
-        $scoresPartition = array_merge(array_fill(0, $numberOfSurvivors, 1), array(0));
-        QueryManager::query('SetRoundCustomPoints', $scoresPartition);
     }
 
     /**
@@ -2892,6 +2862,7 @@ class KnockoutRuntime
             $this->announceRoundInChat();
             $this->updateKoCount();
             $this->updateStatusBar();
+            $this->adjustPoints();
         }
     }
 
@@ -3264,28 +3235,25 @@ class KnockoutRuntime
         switch ($this->koStatus)
         {
             case KnockoutStatus::Idle:
-            case KnockoutStatus::Stopping:
-                return;
+                break;
 
             case KnockoutStatus::RestartingRound:
             case KnockoutStatus::RestartingTrack:
             case KnockoutStatus::SkippingTrack:
                 $this->roundNumber--;
-                return;
+                break;
 
             case KnockoutStatus::Starting:
             case KnockoutStatus::StartingNow:
                 Chat::announce('Knockout starting!');
                 $this->hudReminder();
                 $this->koStatus = KnockoutStatus::Running;
-                $this->adjustPoints(); // SetRoundPointsLimit has to be set before onBeginRound
-                return;
+                break;
 
             case KnockoutStatus::Warmup:
             case KnockoutStatus::SkippingWarmup:
                 $this->roundNumber--;
-                $this->adjustPoints(); // SetRoundPointsLimit has to be set before onBeginRound
-                return;
+                break;
 
             case KnockoutStatus::Running:
             case KnockoutStatus::Tiebreaker:
@@ -3293,7 +3261,6 @@ class KnockoutRuntime
                 $noOneFinished = true;
                 foreach ($scores as $score)
                 {
-                    print_r($score);
                     if ($score['Score'] > 0)
                     {
                         $noOneFinished = false;
@@ -3365,11 +3332,10 @@ class KnockoutRuntime
                             }
                             $this->updateKoCount();
                             $this->updateStatusBar();
-                            $this->adjustPoints(); // SetRoundPointsLimit has to be set before onBeginRound
                         }
                     }
                 }
-                return;
+                break;
         }
     }
 
@@ -3415,8 +3381,6 @@ class KnockoutRuntime
                     {
                         $this->replaceNextTrackIfNeeded();
                     }
-                    Log::debug(sprintf('setting points limit to %d', $this->maxRounds));
-                    QueryManager::query('SetRoundPointsLimit', $this->maxRounds);
                 }
                 break;
 
@@ -3432,18 +3396,6 @@ class KnockoutRuntime
             case KnockoutStatus::SkippingTrack:
                 $this->scores->reset();
                 UI::hideScoreboard();
-                if ($this->isPodium)
-                {
-                    Log::debug(sprintf('setting points limit to %d', $this->maxRounds));
-                    QueryManager::query('SetRoundPointsLimit', $this->maxRounds);
-                }
-                break;
-
-            case KnockoutStatus::Stopping:
-                // After KO stop
-                Log::debug(sprintf('setting points limit to %d', $this->defaultPointsLimit));
-                QueryManager::query('SetRoundPointsLimit', $this->defaultPointsLimit);
-                $this->koStatus = KnockoutStatus::Idle;
                 break;
         }
     }
@@ -3464,12 +3416,6 @@ class KnockoutRuntime
             sprintf('Author skip: $fff%s$g', ($this->authorSkip < 2 ? 'off' : 'for top ' . var_export($this->authorSkip, true)))
         );
         $mode = QueryManager::queryWithResponse('GetNextGameInfo');
-        if ($mode['GameMode'] === GameMode::Rounds)
-        {
-            array_splice($settings, 3, 0, array(
-                sprintf('Rounds per track: $fff%d$g', $this->maxRounds)
-            ));
-        }
         return implode(' | ', $settings);
     }
 
@@ -3570,7 +3516,7 @@ class KnockoutRuntime
                     {
                         $onError('Syntax error: too many arguments ($fff%s$g, expected $fff/ko start$g or $fff/ko start now$g)');
                     }
-                    elseif (is_null($args[1]) || strtolower($args[1]) === 'now')
+                    elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
                     {
                         // Todo: look up on next round's infos with GetNextGameInfo
                         $mode = QueryManager::queryWithResponse('GetGameMode');
@@ -3592,7 +3538,7 @@ class KnockoutRuntime
                         //     return;
                         // }
 
-                        $this->start($players, $args[1] === 'now');
+                        $this->start($players, isset($args[1]) && $args[1] === 'now');
                         Chat::info2('Knockout starting with the following settings:', array($issuerLogin));
                         Chat::info2($this->printSettings(), array($issuerLogin));
                     }
@@ -3608,18 +3554,16 @@ class KnockoutRuntime
                     {
                         $onError('Syntax error: too many arguments ($fff%s$g, expected $fff/ko stop$g)');
                     }
-                    elseif ($this->koStatus !== KnockoutStatus::Idle)
+                    elseif ($this->koStatus === KnockoutStatus::Idle)
                     {
-                        $this->stop();
-                        Log::debug(sprintf('setting points limit to %d', $this->defaultPointsLimit));
-                        QueryManager::query('SetRoundPointsLimit', $this->defaultPointsLimit);
-                        UI::restoreDefaultScoreboard();
-                        $this->koStatus = KnockoutStatus::Idle;
-                        Chat::info('Knockout has been stopped');
+                        $onError('The knockout must be running before this command can be used');
                     }
                     else
                     {
-                        $onError('The knockout must be running before this command can be used');
+                        $this->stop();
+                        UI::restoreDefaultScoreboard();
+                        $this->koStatus = KnockoutStatus::Idle;
+                        Chat::info('Knockout has been stopped');
                     }
                     break;
 
@@ -3633,7 +3577,7 @@ class KnockoutRuntime
                     {
                         $onError('Syntax error: too many arguments (usage: $fff/ko skip$g or $fff/ko skip warmup$g)');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         if ($this->koStatus === KnockoutStatus::Tiebreaker)
                         {
@@ -3680,7 +3624,7 @@ class KnockoutRuntime
                     {
                         $onError('Syntax error: too many arguments (usage: $fff/ko restart$g or $fff/ko restart warmup$g)');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
                         {
@@ -3723,7 +3667,7 @@ class KnockoutRuntime
                     {
                         $onError('The knockout must be running before this command can be used');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko add (<login> | *)$g)');
                     }
@@ -3786,7 +3730,7 @@ class KnockoutRuntime
                     {
                         $onError('The knockout must be running before this command can be used');
                     }
-                    elseif (is_null($args[1]))
+                    elseif (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko remove (<login> | *)$g)');
                     }
@@ -3876,7 +3820,7 @@ class KnockoutRuntime
 
                 // /ko lives (<login> | *) [[+ | -]<lives>]
                 case 'lives':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko lives (<login> | *) [[+ | -]<lives>]$g)');
                     }
@@ -3906,7 +3850,7 @@ class KnockoutRuntime
                             return;
                         }
 
-                        if (is_null($args[2]))
+                        if (!isset($args[2]))
                         {
                             // Display
                             if ($this->koStatus === KnockoutStatus::Idle)
@@ -4010,7 +3954,7 @@ class KnockoutRuntime
                                 break;
 
                             case 'constant':
-                                if (is_null($args[2]))
+                                if (!isset($args[2]))
                                 {
                                     $onError('Syntax error: expected an argument (usage: $fff/ko multi constant <x KOs per round>$g)');
                                 }
@@ -4043,7 +3987,7 @@ class KnockoutRuntime
                                 break;
 
                             case 'extra':
-                                if (is_null($args[2]))
+                                if (!isset($args[2]))
                                 {
                                     $onError('Syntax error: expected an argument (usage: $fff/ko multi extra <per X players>$g)');
                                 }
@@ -4076,7 +4020,7 @@ class KnockoutRuntime
                                 break;
 
                             case 'dynamic':
-                                if (is_null($args[2]))
+                                if (!isset($args[2]))
                                 {
                                     $onError('Syntax error: expected an argument (usage: $fff/ko multi dynamic <X rounds>$g)');
                                 }
@@ -4109,7 +4053,7 @@ class KnockoutRuntime
                                 break;
 
                             default:
-                                if (!is_null($args[1]))
+                                if (isset($args[1]))
                                 {
                                     $onError(sprintf('Syntax error: unexpected argument $fff%s$g (expected $fffconstant$g, $fffextra$g or $fffnone$g)', $args[1]));
                                 }
@@ -4122,49 +4066,9 @@ class KnockoutRuntime
                     }
                     break;
 
-                // /ko rounds <rounds>
-                case 'rounds':
-                    if (is_null($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko rounds <X rounds per track>$g)');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko rounds <X rounds per track>$g)');
-                    }
-                    elseif (!is_numeric($args[1]))
-                    {
-                        $onError(sprintf('Error: argument $fff%s$g is not a number', $args[1]));
-                    }
-                    elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
-                    {
-                        $onError(sprintf('Error: floating point numbers ($fff%s$g) are not supported', $args[2]));
-                    }
-                    else
-                    {
-                        $val = (int) $args[1];
-                        if ($val <= 0)
-                        {
-                            $onError(sprintf('Error: argument $fff%d$g must be greater than 0', $val));
-                        }
-                        else
-                        {
-                            $prev = $this->maxRounds;
-                            $this->maxRounds = $val;
-                            $diff = $val - $prev;
-                            $pointsLimit = QueryManager::queryWithResponse('GetRoundPointsLimit');
-                            if (KnockoutStatus::isInProgress($this->koStatus))
-                            {
-                                QueryManager::query('SetRoundPointsLimit', $pointsLimit['CurrentValue'] + $diff);
-                            }
-                            Chat::info(sprintf('Rounds per track has been set to $fff%d$g (previously $fff%d$g)', $val, $prev));
-                        }
-                    }
-                    break;
-
                 // /ko openwarmup (on | off)
                 case 'openwarmup':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko openwarmup (on | off)$g)');
                     }
@@ -4192,7 +4096,7 @@ class KnockoutRuntime
 
                 // /ko falsestart <max_tries>
                 case 'falsestart':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko falsestart <max tries>$g)');
                     }
@@ -4229,7 +4133,7 @@ class KnockoutRuntime
 
                 // /ko tiebreaker (on | off)
                 case 'tiebreaker':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko tiebreaker (on | off)>$g)');
                     }
@@ -4255,7 +4159,7 @@ class KnockoutRuntime
 
                 // /ko authorskip <for_top_x_players>
                 case 'authorskip':
-                    if (is_null($args[1]))
+                    if (!isset($args[1]))
                     {
                         $onError('Syntax error: expected an argument (usage: $fff/ko authorskip <for top X players>$g)');
                     }
@@ -4438,22 +4342,19 @@ class KnockoutRuntime
 
                     implode($sep2, array(
                         "/ko falsestart {$var}max_tries{$endvar}",
-                        'Sets the limit for how many times the round will be restarted if someone retires before the countdown.'
+                        'Sets the limit for how many times the round will be restarted if someone retires before the',
+                        'countdown.'
                     )),
 
                     implode($sep2, array(
                         "/ko tiebreaker (on | off)",
-                        'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and at not all of them would be knocked out.'
+                        'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and not',
+                        'all of them would be knocked out.'
                     )),
 
                     implode($sep2, array(
                         "/ko authorskip {$var}for_top_x_players{$endvar}",
                         'Automatically skips a track when its author is present, once a given player count has been reached.'
-                    )),
-
-                    implode($sep2, array(
-                        "/ko settings",
-                        'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
                     ))
                 ));
                 UI::showMultiPageDialog("{$prefix}{$text}", $logins, 2, $totalPages, 461, 463);
@@ -4461,6 +4362,11 @@ class KnockoutRuntime
 
             case 3:
                 $text = implode($sep1, array(
+                    implode($sep2, array(
+                        "/ko settings",
+                        'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
+                    )),
+
                     implode($sep2, array(
                         "/ko status",
                         'Shows knockout mode, knockout status, player list and scores in a dialog window.'
@@ -4471,7 +4377,9 @@ class KnockoutRuntime
                         'Shows the list of commands.'
                     )),
 
-                    '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l'
+                    '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md]CLI reference$l',
+
+                    '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md]User guide$l'
                 ));
                 UI::showMultiPageDialog("{$prefix}{$text}", $logins, 3, $totalPages, 462, null);
                 break;
@@ -4640,15 +4548,17 @@ class KnockoutRuntime
      */
     public function test1ChatCommand($args, $issuer)
     {
-        if ($issuer[0] === 'voyager006')
+        if (isadmin($issuer[0]))
         {
-            Log::debug('test1 1');
-            $this->playerList->applyStatusTransition(PlayerStatus::Playing, PlayerStatus::Shelved);
-            Log::debug('test1 2');
+            $this->onPlayerConnect(array(
+                'somerandomdude',
+                false
+            ));
+            Chat::info2('test1 done', array($issuer[0]));
         }
         else
         {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer['Login']));
+            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
         }
     }
 
@@ -4663,15 +4573,18 @@ class KnockoutRuntime
      */
     public function test2ChatCommand($args, $issuer)
     {
-        if ($issuer[0] === 'voyager006')
+        if (isadmin($issuer[0]))
         {
-            Log::debug('test2 1');
-            $this->playerList->applyStatusTransition(PlayerStatus::Shelved, PlayerStatus::Playing);
-            Log::debug('test2 2');
+            $chattime = QueryManager::queryWithResponse('GetChatTime');
+            QueryManager::query('SetChatTime', 0);
+            QueryManager::query('SetGameMode', GameMode::Rounds);
+            QueryManager::query('SetWarmUp', false);
+            QueryManager::query('NextChallenge');
+            QueryManager::query('SetChatTime', $chattime['NextValue']);
         }
         else
         {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer['Login']));
+            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
         }
     }
 
@@ -4686,17 +4599,14 @@ class KnockoutRuntime
      */
     public function test3ChatCommand($args, $issuer)
     {
-        if ($issuer[0] === 'voyager006')
+        if (isadmin($issuer[0]))
         {
-            Log::debug('test3 1');
-            $this->playerList->filterByStatus(PlayerStatus::Playing);
-            Log::debug('test3 2');
-            $this->playerList->filterByStatus(PlayerStatus::OptingOut);
-            Log::debug('test3 3');
+            $scoresPartition = array(-1, -2);
+            QueryManager::query('SetRoundCustomPoints', $scoresPartition, true);
         }
         else
         {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer['Login']));
+            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
         }
     }
 
