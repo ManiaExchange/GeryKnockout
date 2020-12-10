@@ -440,18 +440,122 @@ class QueryManager
 
 
 /**
+ * Utility class for text formatting (not associated with chat)
+ */
+class Text
+{
+    private static function format($text, $color, $highlight, $baseStyle, $initialStyle)
+    {
+        // Regex to let $$ be parsed as a single $ character:
+        // - $o       matches $o
+        // - $$o      no match
+        // - $$$o     matches $o
+        $search = array('/(?:^|[^\$])(?:\${2})*\K\$z/', '/(?:^|[^\$])(?:\${2})*\K\$g/', '/(?:^|[^\$])(?:\${2})*\K\$x/');
+        $replace = array("\$z{$baseStyle}{$color}", $color, $highlight);
+        return sprintf('%s%s%s', $initialStyle, $color, preg_replace($search, $replace, $text));
+    }
+
+    /**
+     * Formats the text as an announcement.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
+     * - `$z`: restores back to the initial style used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $color [Optional] The main color to be used and to replace `$g` with. If null,
+     * a default green color is used.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
+     * @param string $baseStyle [Optional] The base styling to be applied to the text, and to
+     * replace `$z` with. If null, a default shadow is applied.
+     */
+    public static function announce($text, $color = '$0f0', $highlight = '$fff', $baseStyle = '$s', $initialStyle = '$s')
+    {
+        return self::format($text, $color, $highlight, $baseStyle, $initialStyle);
+    }
+
+    /**
+     * Formats the text as an error.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
+     * - `$z`: restores the style to the initial one used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
+     * @param string $baseStyle [Optional] The base styling to be applied to the text, and to
+     * replace `$z` with. If null, a default shadow is applied.
+     */
+    public static function error($text, $highlight = '$fff', $baseStyle = '$s', $initialStyle = '$s')
+    {
+        return self::format($text, '$f00', $highlight, $baseStyle, $initialStyle);
+    }
+
+    /**
+     * Formats the text as an info text.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
+     * - `$z`: restores the style to the initial one used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default yellow color is used.
+     * @param string $baseStyle [Optional] The base styling to be applied to the text, and to
+     * replace `$z` with. If null, a default shadow is applied.
+     */
+    public static function info($text, $highlight = '$ff0', $baseStyle = '$s', $initialStyle = '$s')
+    {
+        return self::format($text, '$fff', $highlight, $baseStyle, $initialStyle);
+    }
+
+    /**
+     * Formats the text as a darker-tone info text.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
+     * - `$z`: restores the style to the initial one used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
+     * @param string $baseStyle [Optional] The base styling to be applied to the text, and to
+     * replace `$z` with. If null, a default shadow is applied.
+     */
+    public static function info2($text, $highlight = '$fff', $baseStyle = '$s', $initialStyle = '$s')
+    {
+        return self::format($text, '$aaa', $highlight, $baseStyle, $initialStyle);
+    }
+}
+
+
+/**
  * Utility class for in-game chat messaging.
  */
 class Chat
 {
     const Prefix = '$ff0';
 
-    private static function sendMessage($color, $highlight, $message, $logins = null)
+    /**
+     * Writes a message to the chat.
+     *
+     * @param string $message The message to be written. May contain in-game formatting.
+     * @param array $logins [Optional] The logins of the players to send the message to. If null,
+     * the message is sent to everyone.
+     */
+    public static function write($message, $logins = null)
     {
-        // Regex to let $$ be parsed as a single $ character
-        $search = array('(?<!\$)\$z', '(?<!\$)\$g', '(?<!\$)\$x');
-        $replace = array('$z$s$g', $color, $highlight);
-        $formatted = sprintf('%s>> %s%s', self::Prefix, $color, preg_replace($search, $replace, $message));
+        $formatted = sprintf('%s>> %s', self::Prefix, $message);
         if (is_null($logins))
         {
             QueryManager::query('ChatSendServerMessage', $formatted);
@@ -468,73 +572,86 @@ class Chat
      *
      * The message may contain in-game formatting itself. Some extra rules are applied:
      *
-     * - `$g`: will be replaced with the main colour used by this function
-     * - `$x`: will be replaced with a highlight colour
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
      * - `$z`: restores the style to the initial one used by this function
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
-     * @param string $color [Optional] The color to be used in the announcement message. If null, a
-     * default green color is used.
+     * @param string $color [Optional] The main color to be used and to replace `$g` with. If null,
+     * a default green color is used.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
      */
-    public static function announce($message, $logins = null, $color = '$0f0', $highlight = '$fff')
+    public static function announce($message, $logins = null, $color = null, $highlight = null)
     {
-        self::sendMessage($color, $highlight, $message, $logins);
+        // Supply '' as initial style as chat messages have shadow already
+        $text = Text::announce($message, $color, $highlight, '$s', '');
+        self::write($text, $logins);
     }
 
     /**
-     * Sends a formatted error message to the chat.
+     * Sends a red-colored, formatted error message to the chat.
      *
      * The message may contain in-game formatting itself. Some extra rules are applied:
      *
-     * - `$g`: will be replaced with the main colour used by this function
-     * - `$x`: will be replaced with a highlight colour
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
      * - `$z`: restores the style to the initial one used by this function
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
      */
     public static function error($message, $logins = null, $highlight = '$fff')
     {
-        self::sendMessage('$f00', $highlight, $message, $logins);
+        $text = Text::error($message, $highlight, '$s', '');
+        self::write($text, $logins);
     }
 
     /**
-     * Sends a formatted information message to the chat.
+     * Sends a white-colored, formatted information message to the chat.
      *
      * The message may contain in-game formatting itself. Some extra rules are applied:
      *
-     * - `$g`: will be replaced with the main colour used by this function
-     * - `$x`: will be replaced with a highlight colour
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
      * - `$z`: restores the style to the initial one used by this function
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
      */
     public static function info($message, $logins = null, $highlight = '$ff0')
     {
-        self::sendMessage('$fff', $highlight, $message, $logins);
+        $text = Text::info($message, $highlight, '$s', '');
+        self::write($text, $logins);
     }
 
     /**
-     * Sends a formatted information message with a darker tone to the chat.
+     * Sends a grey-colored, formatted information message to the chat.
      *
      * The message may contain in-game formatting itself. Some extra rules are applied:
      *
-     * - `$g`: will be replaced with the main colour used by this function
-     * - `$x`: will be replaced with a highlight colour
+     * - `$g`: will be replaced with the main color used by this function
+     * - `$x`: will be replaced with the highlight color or styling
      * - `$z`: restores the style to the initial one used by this function
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
      */
     public static function info2($message, $logins = null, $highlight = '$fff')
     {
-        self::sendMessage('$aaa', $highlight, $message, $logins);
+        $text = Text::info2($message, $highlight, '$s', '');
+        self::write($text, $logins);
     }
 }
 
@@ -548,7 +665,7 @@ class Scores
     const DidNotFinish = -1;
 
     private $scores;
-    private $isAscending; // True for Stunts, false for TA and Rounds
+    private $isAscending; // True for Stunts (points), false for TA and Rounds (round times)
 
     /**
      * Creates an empty scores instance.
@@ -4291,6 +4408,12 @@ class KnockoutRuntime
         $var = '$i';
         $endvar = '$i';
         $totalPages = 3;
+        // $var = function($value)
+        // {
+        //     $before = '$i';
+        //     $after = '$i';
+        //     return "{$before}{$value}{$after}";
+        // };
 
         switch ($pageNumber)
         {
