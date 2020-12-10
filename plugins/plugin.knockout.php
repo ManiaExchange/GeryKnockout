@@ -3081,6 +3081,7 @@ class KnockoutRuntime
         $login = $args[0];
         $joinsAsSpectator = $args[1];
         $playerInfo = QueryManager::queryWithResponse('GetPlayerInfo', $login);
+        $didJoin = false;
         // Only disconnected players who are eligible to rejoin should be matched here; see
         // onPlayerDisconnect
         if ($this->playerList->exists($login))
@@ -3099,6 +3100,7 @@ class KnockoutRuntime
                 case PlayerStatus::PlayingAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Playing);
                     forcePlay(array($login), true);
+                    $didJoin = true;
                     break;
 
                 case PlayerStatus::Shelved:
@@ -3107,6 +3109,7 @@ class KnockoutRuntime
                 case PlayerStatus::ShelvedAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Shelved);
                     forceSpec(array($login), true);
+                    $didJoin = true;
                     break;
 
                 case PlayerStatus::OptingOut:
@@ -3124,6 +3127,7 @@ class KnockoutRuntime
             $this->playerList->add($playerInfo['Login'], $playerInfo['NickName'], PlayerStatus::Playing, $this->lives);
             forcePlay(array($login), true);
             $this->updateKoCount();
+            $didJoin = true;
         }
         else
         {
@@ -3146,7 +3150,14 @@ class KnockoutRuntime
         {
             $this->updateStatusBar($login);
             $this->announceRoundInChat($login);
-            Chat::info('You have entered a match in progress!', array($login));
+            if ($didJoin)
+            {
+                Chat::info('You rejoined in time! You may continue competing. Gogogo', array($login));
+            }
+            else
+            {
+                Chat::info('You have entered a match in progress.', array($login));
+            }
         }
     }
 
