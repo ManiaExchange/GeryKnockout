@@ -88,6 +88,21 @@ function sign($number)
 }
 
 
+/**
+ * Outputs a quantity plus the singular or plural form of its unit, depending on its quantity.
+ *
+ * @param int|float $value The quantity to check against.
+ * @param string $singular The unit to use in singular form.
+ * @param string $plural The unit to use in plural form.
+ *
+ * @return string The quantity, plus the singular or plural form of its unit.
+ */
+function pluralize($value, $singular, $plural)
+{
+    return ($value == 1) ? "{$value} {$singular}" : "{$value} {$plural}";
+}
+
+
 if (!function_exists('str_contains')) {
     /**
      * Checks if a string is contained in another string.
@@ -446,24 +461,24 @@ class Text
 {
     private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
     {
-        $highlight_inv = self::invert($highlight);
         // /(?<!\$)(?:\${2})*\$x/i
-        //   Regex to match a single $x tag, case insensitive
+        //   Regex to match a single formatting tag, case insensitive
         //   - $x       matches $x
         //   - $$x      no match ($$ is parsed as a single $ character)
         //   - $$$x     matches $x
         // /(?<!\$)(?:\${2})*(?:\$x)(.*?)(?<!\$)(?:\${2})*(?:\$x)/i
-        //   Regex to match pairs of tags, case insensitive
+        //   Regex to match pairs of formatting tags, case insensitive
         //   - $xOne                no match
-        //   - $xOne$xTwo           matches $xOne$x, group 1 (\1) = One
+        //   - $xOne$xTwo           matches $xOne$x, group 1 = One
         //   - $xOne$$xTwo$xThree   matches $xOne$$xTwo$x, group 1 = One$$xTwo
         //
-        // The last regex takes care of $x tags with no corresponding closing tag
+        // The last regex below takes care of $x tags with no corresponding closing tag
+        $highlight_inv = self::invert($highlight);
         $search = array(
-            '/(?<!\$)(?:\${2})*\$z/i',
-            '/(?<!\$)(?:\${2})*\$g/i',
+            '/(?<!\$)(?:\${2})*\K\$z/i',
+            '/(?<!\$)(?:\${2})*\K\$g/i',
             '/(?<!\$)(?:\${2})*(?:\$x)(.*?)(?<!\$)(?:\${2})*(?:\$x)/i',
-            '/(?<!\$)(?:\${2})*\$x/i'
+            '/(?<!\$)(?:\${2})*\K\$x/i'
         );
         $replace = array(
             "\$z{$baseStyle}{$baseColor}",
@@ -472,20 +487,30 @@ class Text
             $highlight
         );
         $formatted = preg_replace($search, $replace, $text);
-        if ($startWithBaseStyle)
-        {
-            return "{$baseStyle}{$baseColor}{$formatted}";
-        }
-        else
-        {
-            return "{$baseColor}{$formatted}";
-        }
+        return $startWithBaseStyle ? "{$baseStyle}{$baseColor}{$formatted}" : "{$baseColor}{$formatted}";
     }
 
+    /**
+     * Inverts the effect of a given formatting tag or a combination of formatting tags.
+     *
+     * Using the returned value of this function will 'undo' the changes applied by the parameter
+     * string (with the exception of `$g`, `$m` and `$z`). Examples:
+     *
+     * - `$s` -> `$s`
+     * - `$w` -> `$m`
+     * - `$aaa` -> `$g`
+     * - `$w$aaa` -> `$m$g`
+     *
+     * @param string $style A formatting tag or a combination of formatting tags to invert the
+     * effect of. The string must only contain valid formatting tags; text and `$$` will not be
+     * filtered out.
+     *
+     * @return string A string that inverts the effect given by the parametered string.
+     */
     private static function invert($style)
     {
-        $search = array('/\$n/i', '/\$w/i', '/\$[0-9a-f]{3}/i');
-        $replace = array("\$m", "\$m", "\$g");
+        $search = array('/\$[gmz]/i', '/\$n/i', '/\$w/i', '/\$[0-9a-f]{3}/i');
+        $replace = array("", "\$m", "\$m", "\$g");
         return preg_replace($search, $replace, $style);
     }
 
@@ -507,6 +532,8 @@ class Text
      * when `$z` is used. If null, a default shadow is applied.
      * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
      * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
      */
     public static function announce($text, $baseColor = '$0f0', $highlight = '$fff', $baseStyle = '$s', $startWithBaseStyle = true)
     {
@@ -529,6 +556,8 @@ class Text
      * when `$z` is used. If null, a default shadow is applied.
      * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
      * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
      */
     public static function error($text, $highlight = '$fff', $baseStyle = '$s', $startWithBaseStyle = true)
     {
@@ -551,6 +580,8 @@ class Text
      * when `$z` is used. If null, a default shadow is applied.
      * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
      * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
      */
     public static function info($text, $highlight = '$ff0', $baseStyle = '$s', $startWithBaseStyle = true)
     {
@@ -573,6 +604,8 @@ class Text
      * when `$z` is used. If null, a default shadow is applied.
      * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
      * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
      */
     public static function info2($text, $highlight = '$fff', $baseStyle = '$s', $startWithBaseStyle = true)
     {
@@ -1672,13 +1705,13 @@ class KOMultiplier
             case self::None:
                 return 'None';
             case self::Constant:
-                return sprintf('Constant (%d %s per round)', $this->value, $this->value === 1 ? 'KO' : 'KOs');
+                return sprintf('Constant (%s per round)', pluralize($this->value, 'KO', 'KOs'));
             case self::Extra:
-                return sprintf('Extra (KO per %d %s)', $this->value, $this->value === 1 ? 'player' : 'players');
+                return sprintf('Extra (KO per %s)', pluralize($this->value, 'player', 'players'));
             case self::Dynamic:
-                return sprintf('Dynamic (aiming for %d %s)', $this->value, $this->value === 1 ? 'round' : 'rounds');
+                return sprintf('Dynamic (aiming for %s)', pluralize($this->value, 'round', 'rounds'));
             case self::Tiebreaker:
-                return sprintf('Tiebreaker (%d %s remaining)', $this->value, $this->value === 1 ? 'KO' : 'KOs');
+                return sprintf('Tiebreaker (%s remaining)', pluralize($this->value, 'KO', 'KOs'));
             default:
                 Log::warning(
                     'KO multiplier is in unknown state (%s, %d)',
@@ -2083,19 +2116,6 @@ function isForced($player)
     {
         return false;
     }
-}
-
-
-/**
- * Outputs a quantity plus the singular or plural form of its unit, depending on its quantity.
- *
- * @param int|float $value The quantity to check against.
- * @param string $singular The unit to use in singular form.
- * @param string $plural The unit to use in plural form.
- */
-function pluralize($value, $singular, $plural)
-{
-    return ($value == 1) ? "{$value} {$singular}" : "{$value} {$plural}";
 }
 
 
@@ -2615,8 +2635,8 @@ class KnockoutRuntime
         {
             forceSpec(array($login), true);
             $msg = $score > 0
-                ? sprintf('$x%s$z has been KO\'d by a worst place finish', $nickName)
-                : sprintf('$x%s$z has been KO\'d by a DNF', $nickName);
+                ? sprintf('$x%s$z is KO\'d by a worst place finish', $nickName)
+                : sprintf('$x%s$z is KO\'d by a DNF', $nickName);
             Chat::info($msg);
             if (PlayerStatus::isDisconnected($player['Status']))
             {
@@ -2732,7 +2752,7 @@ class KnockoutRuntime
             QueryManager::query('SetNextChallengeIndex', $nextChallengeIndex + 1);
             $nbSkips++;
             Chat::info(sprintf(
-                'Skipping $x%s$z as $x%s$z is still in the KO (%d/%d)',
+                'Skipping $x%s$z as $x%s$z is still participating (%d/%d)',
                 $nextChallenge['Name'],
                 $nextAuthor['NickName'],
                 $nbSkips,
@@ -4063,7 +4083,7 @@ class KnockoutRuntime
                         {
                             $sign = substr($args[2], 0, 1);
                             $value = abs((int) $args[2]);
-                            $livesStr = $value === 1 ? 'life' : 'lives';
+                            $livesStr = pluralize($value, 'life', 'lives');
                             if ($value === 0)
                             {
                                 $onError(sprintf('Error: argument $x%d$x must be a non-zero value', $value));
@@ -4077,7 +4097,7 @@ class KnockoutRuntime
                                 {
                                     if (KnockoutStatus::isInProgress($this->koStatus))
                                     {
-                                        Chat::info(sprintf('All players have been %s %d %s', $actionStr, $value, $livesStr));
+                                        Chat::info(sprintf('All players have been %s %s', $actionStr, $livesStr));
                                     }
                                     else
                                     {
@@ -4088,7 +4108,7 @@ class KnockoutRuntime
                                 else
                                 {
                                     $target = $this->playerList->get($args[1]);
-                                    Chat::info(sprintf('$x%s$z has been %s %d %s (currently at %d)', $target['NickName'], $actionStr, $value, $livesStr, $target['Lives']));
+                                    Chat::info(sprintf('$x%s$z has been %s %s (currently at %d)', $target['NickName'], $actionStr, $livesStr, $target['Lives']));
                                 }
                             }
                             else
@@ -4099,7 +4119,7 @@ class KnockoutRuntime
                                 {
                                     if (KnockoutStatus::isInProgress($this->koStatus))
                                     {
-                                        Chat::info(sprintf('All players have now %d %s', $value, $livesStr));
+                                        Chat::info(sprintf('All players have now %s', $livesStr));
                                     }
                                     else
                                     {
@@ -4108,7 +4128,7 @@ class KnockoutRuntime
                                 }
                                 else
                                 {
-                                    Chat::info(sprintf('$x%s$z has now %d %s', $playersToUpdate[0]['NickName'], $value, $livesStr));
+                                    Chat::info(sprintf('$x%s$z has now %s', $playersToUpdate[0]['NickName'], $livesStr));
                                 }
                             }
                         }
@@ -4402,10 +4422,9 @@ class KnockoutRuntime
                         $playerList = array_map(
                             function($player)
                             {
-                                return sprintf('%s (%s %s)',
+                                return sprintf('%s (%s)',
                                     getNameOfConstant($player['Status'], 'PlayerStatus'),
-                                    $player['Lives'],
-                                    $player['Lives'] === 1 ? 'life' : 'lives'
+                                    pluralize($player['Lives'], 'life', 'lives')
                                 );
                             },
                             $this->playerList->getAll()
