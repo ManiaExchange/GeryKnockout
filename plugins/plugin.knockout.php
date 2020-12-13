@@ -3644,7 +3644,7 @@ class KnockoutRuntime
                 {
                     $this->scores->reset();
                     UI::hideScoreboard();
-                    $playerCount = count($this->playerList->getAll());
+                    $playerCount = count($this->playerList->getPlaying());
                     if ($playerCount <= $this->authorSkip)
                     {
                         $this->replaceNextTrackIfNeeded();
