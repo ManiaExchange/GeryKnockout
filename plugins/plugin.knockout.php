@@ -471,7 +471,8 @@ class Text
         $openedTags = array();
         while ($index < $length)
         {
-            if ($text[$index] === '$')
+            $current = $text[$index];
+            if ($current === '$')
             {
                 if ($index === $length - 1)
                 {
@@ -479,26 +480,26 @@ class Text
                 }
                 else
                 {
-                    $nextChar = $text[$index + 1];
-                    if (preg_match('/[0-9a-f]/i', $nextChar))
+                    $next = $text[$index + 1];
+                    if (preg_match('/[0-9a-f]/i', $next))
                     {
                         $result .= $callback(substr($text, $index, 4));
                         $index += 4;
                     }
-                    elseif (preg_match('/[gmz]/i', $nextChar))
+                    elseif (preg_match('/[gmz]/i', $next))
                     {
-                        if ($nextChar === 'z') $openedTags = array();
-                        $result .= $callback(substr($text, $index, 2));
+                        if ($next === 'z') $openedTags = array();
+                        $result .= $callback("\${$next}");
                         $index += 2;
                     }
-                    elseif ($nextChar === '$')
+                    elseif ($next === '$')
                     {
                         $result .= '$$';
                         $index += 2;
                     }
                     else
                     {
-                        $tag = substr($text, $index, 2);
+                        $tag = "\${$next}";
                         $openedTags[$tag] = isset($openedTags[$tag]) ? !$openedTags[$tag] : true;
                         $result .= $callback($tag, $openedTags[$tag]);
                         $index += 2;
@@ -552,14 +553,15 @@ class Text
 
     private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
     {
-        $replace = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight)
+        $highlight_inv = self::invert($highlight);
+        $replace = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight, $highlight_inv)
         {
             switch (strtolower($tag))
             {
                 case '$g':
                     return $baseColor;
                 case '$x':
-                    return $isOpeningTag ? $highlight : self::invert($highlight);
+                    return $isOpeningTag ? $highlight : $highlight_inv;
                 case '$z':
                     return sprintf('$z%s%s', $baseStyle, $baseColor);
                 default:
