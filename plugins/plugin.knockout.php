@@ -3255,7 +3255,7 @@ class KnockoutRuntime
                 $joinsAsSpectator ? PlayerStatus::KnockedOutAndSpectating : PlayerStatus::KnockedOut,
                 0
             );
-            if ($this->openWarmup && ($this->isWarmup || $this->isPodium) && !$joinsAsSpectator)
+            if ($this->openWarmup && $this->isWarmup && !$joinsAsSpectator)
             {
                 forcePlay(array($login), false);
             }
