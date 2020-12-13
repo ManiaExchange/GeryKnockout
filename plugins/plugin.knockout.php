@@ -452,7 +452,7 @@ class QueryManager
 class Text
 {
     /**
-     * Finds and replaces formatting tags in a string.
+     * Finds and replaces formatting tags in a string using a callback function.
      *
      * @param string $text The text to modify.
      * @param Callable $callback A function to replace found tags with. It must support at least one
@@ -463,7 +463,7 @@ class Text
      *
      * @return string The input string with tags replaced according to the callback function.
      */
-    public static function findAndReplace($text, $callback)
+    public static function findAndReplaceCallback($text, $callback)
     {
         $index = 0;
         $length = strlen($text);
@@ -483,13 +483,13 @@ class Text
                     $next = $text[$index + 1];
                     if (preg_match('/[0-9a-f]/i', $next))
                     {
-                        $result .= $callback(substr($text, $index, 4));
+                        $result .= $callback(substr($text, $index, 4), null);
                         $index += 4;
                     }
                     elseif (preg_match('/[gmz]/i', $next))
                     {
                         if ($next === 'z') $openedTags = array();
-                        $result .= $callback("\${$next}");
+                        $result .= $callback('$' . $next, null);
                         $index += 2;
                     }
                     elseif ($next === '$')
@@ -499,7 +499,7 @@ class Text
                     }
                     else
                     {
-                        $tag = "\${$next}";
+                        $tag = '$' . $next;
                         $openedTags[$tag] = isset($openedTags[$tag]) ? !$openedTags[$tag] : true;
                         $result .= $callback($tag, $openedTags[$tag]);
                         $index += 2;
@@ -516,6 +516,27 @@ class Text
     }
 
     /**
+     * Finds and replaces the given formatting tag in a string.
+     *
+     * @param string $text The text to modify.
+     * @param string $search The formatting tag to find.
+     * @param string $replace The string to replace the tag with.
+     *
+     * @return string The input string with occurrences of the tag replaced with the given
+     * replacement.
+     */
+    public static function findAndReplace($text, $search, $replace)
+    {
+        $search = strtolower($search);
+        $callback = function($tag) use($search, $replace)
+        {
+            if (strtolower($tag) === $search) return $replace;
+            else return $tag;
+        };
+        return self::findAndReplaceCallback($text, $callback);
+    }
+
+    /**
      * Removes all formatting in a string.
      *
      * @param string $text The text to remove formatting from.
@@ -524,7 +545,7 @@ class Text
      */
     public static function clean($text)
     {
-        return self::findAndReplace($text, function() { return ''; });
+        return self::findAndReplaceCallback($text, function() { return ''; });
     }
 
     /**
@@ -553,8 +574,8 @@ class Text
 
     private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
     {
-        $highlight_inv = self::invert($highlight);
-        $replace = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight, $highlight_inv)
+        $highlight_inv = self::findAndReplace(self::invert($highlight), '$g', $baseColor);
+        $callback = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight, $highlight_inv)
         {
             switch (strtolower($tag))
             {
@@ -568,7 +589,9 @@ class Text
                     return $tag;
             }
         };
-        $formatted = self::findAndReplace($text, $replace);
+        Log::debug(sprintf('before: %s', $text));
+        $formatted = self::findAndReplaceCallback($text, $callback);
+        Log::debug(sprintf('after: %s', $formatted));
         if ($startWithBaseStyle) return "{$baseStyle}{$baseColor}{$formatted}";
         else return "{$baseColor}{$formatted}";
     }
@@ -594,8 +617,11 @@ class Text
      *
      * @return string The formatted text.
      */
-    public static function announce($text, $baseColor = '$0f0', $highlight = '$fff', $baseStyle = '$s', $startWithBaseStyle = true)
+    public static function announce($text, $baseColor = null, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
     {
+        if (is_null($baseColor)) $baseColor = '$0f0';
+        if (is_null($highlight)) $highlight = '$fff';
+        if (is_null($baseStyle)) $baseStyle = '$s';
         return self::format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle);
     }
 
@@ -618,8 +644,10 @@ class Text
      *
      * @return string The formatted text.
      */
-    public static function error($text, $highlight = '$fff', $baseStyle = '$s', $startWithBaseStyle = true)
+    public static function error($text, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
     {
+        if (is_null($highlight)) $highlight = '$fff';
+        if (is_null($baseStyle)) $baseStyle = '$s';
         return self::format($text, '$f00', $highlight, $baseStyle, $startWithBaseStyle);
     }
 
@@ -642,8 +670,10 @@ class Text
      *
      * @return string The formatted text.
      */
-    public static function info($text, $highlight = '$ff0', $baseStyle = '$s', $startWithBaseStyle = true)
+    public static function info($text, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
     {
+        if (is_null($highlight)) $highlight = '$ff0';
+        if (is_null($baseStyle)) $baseStyle = '$s';
         return self::format($text, '$fff', $highlight, $baseStyle, $startWithBaseStyle);
     }
 
@@ -666,8 +696,10 @@ class Text
      *
      * @return string The formatted text.
      */
-    public static function info2($text, $highlight = '$fff', $baseStyle = '$s', $startWithBaseStyle = true)
+    public static function info2($text, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
     {
+        if (is_null($highlight)) $highlight = '$fff';
+        if (is_null($baseStyle)) $baseStyle = '$s';
         return self::format($text, '$aaa', $highlight, $baseStyle, $startWithBaseStyle);
     }
 }
