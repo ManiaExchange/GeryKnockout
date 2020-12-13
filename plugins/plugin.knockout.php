@@ -2300,7 +2300,7 @@ class KnockoutRuntime
         $playersWithHudOn = array();
         if ($login !== null)
         {
-            if (hasHudOn($login))
+            if (isOnServer($login) && hasHudOn($login))
             {
                 $playersWithHudOn = array($this->playerList->get($login));
             }
@@ -2330,7 +2330,7 @@ class KnockoutRuntime
         $playersWithHudOff = array();
         if ($login !== null)
         {
-            if (!hasHudOn($login))
+            if (isOnServer($login) && !hasHudOn($login))
             {
                 $playersWithHudOff = array($this->playerList->get($login));
             }
