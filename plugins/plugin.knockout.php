@@ -5,7 +5,7 @@
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
 
-const Version = '2.0.0 (beta)';
+const Version = '2.0.1 (beta)';
 const MinimumLogLevel = Log::Information;
 
 
