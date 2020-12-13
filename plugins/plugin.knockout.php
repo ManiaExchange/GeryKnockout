@@ -440,54 +440,90 @@ class QueryManager
     {
         global $client;
 
-        $success = call_user_func_array(array($client, 'query'), func_get_args());
-        if (!$success)
-        {
-            self::handleError($methodName);
-            return false;
-        }
-        else
-        {
-            return $client->getResponse();
-        }
+        $success = call_user_func_array(array(__CLASS__, 'query'), func_get_args());
+        return $success ? $client->getResponse() : false;
     }
 }
 
 
 /**
- * Utility class for text formatting (not associated with chat)
+ * Utility class for text formatting (not associated with chat).
  */
 class Text
 {
-    private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
+    /**
+     * Finds and replaces formatting tags in a string.
+     *
+     * @param string $text The text to modify.
+     * @param Callable $callback A function to replace found tags with. It must support at least one
+     * argument, the argument being the tag that was found. Its capitalization is unaltered. For
+     * tags except `$000`-`$fff`, `$g`, `$m` and `$z`, a second argument is used; a boolean
+     * indicating whether it is the opening tag or not. The function should return a string; the
+     * replacement for the given tag.
+     *
+     * @return string The input string with tags replaced according to the callback function.
+     */
+    public static function findAndReplace($text, $callback)
     {
-        // /(?<!\$)(?:\${2})*\$x/i
-        //   Regex to match a single formatting tag, case insensitive
-        //   - $x       matches $x
-        //   - $$x      no match ($$ is parsed as a single $ character)
-        //   - $$$x     matches $x
-        // /(?<!\$)(?:\${2})*(?:\$x)(.*?)(?<!\$)(?:\${2})*(?:\$x)/i
-        //   Regex to match pairs of formatting tags, case insensitive
-        //   - $xOne                no match
-        //   - $xOne$xTwo           matches $xOne$x, group 1 = One
-        //   - $xOne$$xTwo$xThree   matches $xOne$$xTwo$x, group 1 = One$$xTwo
-        //
-        // The last regex below takes care of $x tags with no corresponding closing tag
-        $highlight_inv = self::invert($highlight);
-        $search = array(
-            '/(?<!\$)(?:\${2})*\K\$z/i',
-            '/(?<!\$)(?:\${2})*\K\$g/i',
-            '/(?<!\$)(?:\${2})*(?:\$x)(.*?)(?<!\$)(?:\${2})*(?:\$x)/i',
-            '/(?<!\$)(?:\${2})*\K\$x/i'
-        );
-        $replace = array(
-            "\$z{$baseStyle}{$baseColor}",
-            $baseColor,
-            "{$highlight}\1{$highlight_inv}",
-            $highlight
-        );
-        $formatted = preg_replace($search, $replace, $text);
-        return $startWithBaseStyle ? "{$baseStyle}{$baseColor}{$formatted}" : "{$baseColor}{$formatted}";
+        $index = 0;
+        $length = strlen($text);
+        $result = '';
+        $openedTags = array();
+        while ($index < $length)
+        {
+            if ($text[$index] === '$')
+            {
+                if ($index === $length - 1)
+                {
+                    return $result;
+                }
+                else
+                {
+                    $nextChar = $text[$index + 1];
+                    if (preg_match('/[0-9a-f]/i', $nextChar))
+                    {
+                        $result .= $callback(substr($text, $index, 4));
+                        $index += 4;
+                    }
+                    elseif (preg_match('/[gmz]/i', $nextChar))
+                    {
+                        if ($nextChar === 'z') $openedTags = array();
+                        $result .= $callback(substr($text, $index, 2));
+                        $index += 2;
+                    }
+                    elseif ($nextChar === '$')
+                    {
+                        $result .= '$$';
+                        $index += 2;
+                    }
+                    else
+                    {
+                        $tag = substr($text, $index, 2);
+                        $openedTags[$tag] = isset($openedTags[$tag]) ? !$openedTags[$tag] : true;
+                        $result .= $callback($tag, $openedTags[$tag]);
+                        $index += 2;
+                    }
+                }
+            }
+            else
+            {
+                $result .= $text[$index];
+                $index += 1;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Removes all formatting in a string.
+     *
+     * @param string $text The text to remove formatting from.
+     *
+     * @return string The unformatted equivalent of the input text.
+     */
+    public static function clean($text)
+    {
+        return self::findAndReplace($text, function() { return ''; });
     }
 
     /**
@@ -507,11 +543,32 @@ class Text
      *
      * @return string A string that inverts the effect given by the parametered string.
      */
-    private static function invert($style)
+    public static function invert($style)
     {
-        $search = array('/\$[gmz]/i', '/\$n/i', '/\$w/i', '/\$[0-9a-f]{3}/i');
+        $search = array('/\$[gmz]/i', '/\$n/i', '/\$w/i', '/\$[0-9a-f].{0,2}/i');
         $replace = array("", "\$m", "\$m", "\$g");
         return preg_replace($search, $replace, $style);
+    }
+
+    private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
+    {
+        $replace = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight)
+        {
+            switch (strtolower($tag))
+            {
+                case '$g':
+                    return $baseColor;
+                case '$x':
+                    return $isOpeningTag ? $highlight : self::invert($highlight);
+                case '$z':
+                    return sprintf('$z%s%s', $baseStyle, $baseColor);
+                default:
+                    return $tag;
+            }
+        };
+        $formatted = self::findAndReplace($text, $replace);
+        if ($startWithBaseStyle) return "{$baseStyle}{$baseColor}{$formatted}";
+        else return "{$baseColor}{$formatted}";
     }
 
     /**
@@ -737,19 +794,24 @@ class Scores
 
     private function getComparator()
     {
-        return $this->isAscending
-            ? function($a, $b)
+        if ($this->isAscending)
+        {
+            return function($a, $b)
             {
                 if ($b['Score'] <= 0) return -1;
                 elseif ($a['Score'] <= 0) return 1;
                 else return $a['Score'] < $b['Score'] ? -1 : 1;
-            }
-            : function($a, $b)
+            };
+        }
+        else
+        {
+            return function($a, $b)
             {
                 if ($b['Score'] <= 0) return -1;
                 elseif ($a['Score'] <= 0) return 1;
                 else return $a['Score'] > $b['Score'] ? -1 : 1;
             };
+        }
     }
 
     /**
@@ -2635,8 +2697,8 @@ class KnockoutRuntime
         {
             forceSpec(array($login), true);
             $msg = $score > 0
-                ? sprintf('$x%s$z is KO\'d by a worst place finish', $nickName)
-                : sprintf('$x%s$z is KO\'d by a DNF', $nickName);
+                ? sprintf('$x%s$z is KO by a worst place finish', $nickName)
+                : sprintf('$x%s$z is KO by a DNF', $nickName);
             Chat::info($msg);
             if (PlayerStatus::isDisconnected($player['Status']))
             {
@@ -3208,11 +3270,11 @@ class KnockoutRuntime
             $this->announceRoundInChat($login);
             if ($didJoin)
             {
-                Chat::info('You rejoined in time! You may continue competing. Gogogo', array($login));
+                Chat::info('You rejoined in time! Gogogo', array($login));
             }
             else
             {
-                Chat::info('You have entered a match in progress.', array($login));
+                Chat::info('You have entered a match in progress', array($login));
             }
         }
     }
