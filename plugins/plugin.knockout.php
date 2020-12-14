@@ -1061,7 +1061,8 @@ class PlayerList
      * Gets a player object by their login.
      *
      * @param string $login The login of the player.
-     * @return mixed[] The player object if found, null otherwise.
+     *
+     * @return mixed[]|null The player object if found, null otherwise.
      */
     public function get($login)
     {
@@ -1233,38 +1234,6 @@ class PlayerList
             $this->players[$login]['Status'] = $nextPlayerStatus;
         }
     }
-
-    /**
-     * Adds a life to the given player.
-     *
-     * @param string $login The login of the player who should receive a life.
-     * @param bool $isTiebreaker Whether there is a tiebreaker running or not. If there is, the
-     * player will be shelved instead of playing.
-     *
-     * @return bool True if the player has been reinstated, false otherwise.
-     */
-    // public function addLife($login)
-    // {
-    //     if (isset($this->players[$login]))
-    //     {
-    //         $this->players[$login]['Lives'] += 1;
-    //         $status = $this->players[$login]['Status'];
-    //         if ($status === PlayerStatus::KnockedOut || $status === PlayerStatus::KnockedOutAndSpectating)
-    //         {
-    //             $this->players[$login]['Status'] = PlayerStatus::Playing;
-    //             return true;
-    //         }
-    //         else
-    //         {
-    //             return false;
-    //         }
-    //     }
-    //     else
-    //     {
-    //         Log::warning(sprintf('Player %s is not in the player list', $login));
-    //         return false;
-    //     }
-    // }
 
     /**
      * Subtracts a life from the given player at the end of a round.
@@ -2356,9 +2325,9 @@ class KnockoutRuntime
                     Chat::announce('Knockout Warmup', $playersWithHudOff, '$f80');
                     foreach ($playersWithHudOff as $login)
                     {
-                        $player = $this->playerList->get($login);
-                        if ($player !== false)
+                        if ($this->playerList->exists($login))
                         {
+                            $player = $this->playerList->get($login);
                             Chat::info(
                                 sprintf('Status: %s', PlayerStatus::output($player['Status'])),
                                 $login
@@ -2381,9 +2350,9 @@ class KnockoutRuntime
                     );
                     foreach ($playersWithHudOff as $login)
                     {
-                        $player = $this->playerList->get($login);
-                        if ($player !== false)
+                        if ($this->playerList->exists($login))
                         {
+                            $player = $this->playerList->get($login);
                             Chat::info(
                                 sprintf('Status: %s', PlayerStatus::output($player['Status'])),
                                 $login
