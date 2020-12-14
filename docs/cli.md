@@ -1,6 +1,10 @@
 # CLI reference
 
+Commands are case insensitive, logins are case sensitive.
+
 ## Admin commands
+
+All admin commands are available to players defined in the `admin` and `admin2` arrays.
 
 ### /ko start [now]
 Starts the knockout. If "now" is given, the current track will be skipped; otherwise the knockout will be scheduled to start on the next round (or after the warmup, if there currently is one). All players will be forced to play unless they opt out using `/opt out`.
