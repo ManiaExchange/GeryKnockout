@@ -4,7 +4,7 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-const Version = '2.0.1 (beta)';
+const Version = '2.0.1';
 const MinimumLogLevel = Log::Information;
 
 
@@ -421,8 +421,8 @@ class Text
      *
      * @param string $text The text to modify.
      * @param Callable $callback A function to replace found tags with. It must support at least one
-     * argument, the argument being the tag that was found. Its capitalization is unaltered. For
-     * tags except `$000`-`$fff`, `$g`, `$m` and `$z`, a second argument is used; a boolean
+     * argument, the argument being the tag string that was found. Its capitalization is unaltered.
+     * For tags except `$000`-`$fff`, `$g`, `$m` and `$z`, a second argument is used; a boolean
      * indicating whether it is the opening tag or not. The function should return a string; the
      * replacement for the given tag.
      *
