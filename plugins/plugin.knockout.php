@@ -2308,57 +2308,54 @@ class KnockoutRuntime
         $playersWithHudOff = array();
         if ($login !== null)
         {
-            if (isOnServer($login) && !hasHudOn($login))
+            if ($this->playerList->exists($login) && !hasHudOn($login))
             {
                 $playersWithHudOff = array($this->playerList->get($login));
             }
         }
         else
         {
-            $playersWithHudOff = array_keys($this->getPlayersWithHudOff());
+            $playersWithHudOff = $this->getPlayersWithHudOff();
         }
         if (count($playersWithHudOff) > 0)
         {
+            $printPlayerStatus = function() use($playersWithHudOff)
+            {
+                foreach ($playersWithHudOff as $player)
+                {
+                    Chat::info(
+                        sprintf('Status: %s', PlayerStatus::output($player['Status'])),
+                        $player['Login']
+                    );
+                }
+            };
+            $logins = logins($playersWithHudOff);
+            $printKoStatus = function($players, $kosThisRound) use($logins)
+            {
+                Chat::info(
+                    sprintf(
+                        '%s remaining, %s this round',
+                        pluralize(count($players), 'player', 'players'),
+                        pluralize($kosThisRound, 'KO', 'KOs')
+                    ),
+                    $logins
+                );
+            };
             switch ($this->koStatus)
             {
                 case KnockoutStatus::Warmup:
-                    Chat::announce('Knockout Warmup', $playersWithHudOff, '$f80');
-                    foreach ($playersWithHudOff as $login)
-                    {
-                        if ($this->playerList->exists($login))
-                        {
-                            $player = $this->playerList->get($login);
-                            Chat::info(
-                                sprintf('Status: %s', PlayerStatus::output($player['Status'])),
-                                $login
-                            );
-                        }
-                    }
+                    Chat::announce('Knockout Warmup', $logins, '$f80');
+                    $printPlayerStatus();
                     break;
                 case KnockoutStatus::Tiebreaker:
-                    Chat::announce('Knockout Tiebreaker', $playersWithHudOff, '$f00');
+                    Chat::announce('Knockout Tiebreaker', $logins, '$f00');
+                    $printKoStatus($this->playerList->getPlaying(), $this->kosThisRound);
+                    $printPlayerStatus();
                     break;
                 case KnockoutStatus::Running:
-                    Chat::announce(sprintf('Knockout Round $x%d', $this->roundNumber), $playersWithHudOff);
-                    Chat::info(
-                        sprintf(
-                            '%s remaining, %s this round',
-                            pluralize(count($this->playerList->getPlaying()), 'player', 'players'),
-                            pluralize($this->kosThisRound, 'KO', 'KOs')
-                        ),
-                        $playersWithHudOff
-                    );
-                    foreach ($playersWithHudOff as $login)
-                    {
-                        if ($this->playerList->exists($login))
-                        {
-                            $player = $this->playerList->get($login);
-                            Chat::info(
-                                sprintf('Status: %s', PlayerStatus::output($player['Status'])),
-                                $login
-                            );
-                        }
-                    }
+                    Chat::announce(sprintf('Knockout Round $x%d', $this->roundNumber), $logins);
+                    $printKoStatus($this->playerList->getPlaying(), $this->kosThisRound);
+                    $printPlayerStatus();
                     break;
                 case KnockoutStatus::RestartingRound:
                 case KnockoutStatus::RestartingTrack:
