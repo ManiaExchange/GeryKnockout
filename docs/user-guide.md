@@ -153,7 +153,7 @@ When a player gets last, they will lose a life. If it was their last life, they 
 The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). The number of lives may be relative (by using a + or - sign in front of the number) or absolute.
 
 ### Rounds per track
-If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0.
+If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. KOs will be performed after each round. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0.
 
 Note: it is recommended to disable tiebreakers and use 1 life for each player to avoid unwanted side effects.
 
@@ -266,7 +266,7 @@ The following bugs have been fixed since v.082.9:
 - Fixed bug where a player that has been forced in during warmup is not knocked out if last.
 - Fixed bug where forcing a player in as the third player will end the knockout afterwards.
 - Fixed bug where the winner of a previous knockout would be crowned as the winner when stopping a knockout manually.
-- Patched vulnerability where the script will KO everyone if `/restart` or `/gonext` is used.
+- Partially patched vulnerability where the script will KO everyone if `/restart` or `/gonext` is used.
 - Commands for starting a knockout, restarting a map and skipping a map now work when issued during the synchronization phase; these will take effect after a small delay (when the round starts).
 
 `/restart`, `/gonext` and `/end` can be used interchangeably with `/ko restart`, `/ko skip` and `/ko skip warmup` respectively, as long as no one has finished yet. Though, the new commands offer new functionality such as restarting the current track with a warmup (using `/ko restart warmup`), protection against unwanted KOs if someone have finished, and proper state management (status is reflected in the top bar).

@@ -4,43 +4,8 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-
-const Version = '2.0.0 (beta)';
+const Version = '2.0.1';
 const MinimumLogLevel = Log::Information;
-
-
-/*
- * Some notes about commands and callbacks:
- *
- * onStatusChange and respective callbacks are called in varying order:
- *
- * - onStatusChange (Launching) -> onBeginRace
- * - onStatusChange (Synchronization) ->
- * - onBeginRound -> onStatusChange (Play)
- * - onEndRound ->
- * - onEndRace -> onStatusChange (Finish)
- *
- * Some XML-RPC methods only work at specific points in a match. Calling them at an unsuitable time
- * may yield no result or an error from the client. Some of these cases are listed below:
- *
- * - NextChallenge
- * - RestartChallenge/ChallengeRestart
- *
- * Results in error code -1000 (Change in progress), if proceeding to next round, in Finish and
- * Synchronization. Otherwise, results in error code -1000 in Synchronization (but works in Finish).
- *
- * - SendDisplayManialinkPage
- * - SendDisplayManialinkPageToLogin
- *
- * May not have an effect with custom_ui when called in onBeginSynchronization (but could be due to
- * Tm-Gery)
- *
- * - SetRoundCustomPoints
- * - SetRoundPointsLimit
- *
- * Has to be set before onStatusChange (Synchronization) in order to have effect on the upcoming
- * round.
- */
 
 
 /**
@@ -85,6 +50,21 @@ function sign($number)
     if ($number < 0) return -1;
     elseif ($number > 0) return 1;
     else return 0;
+}
+
+
+/**
+ * Outputs a quantity plus the singular or plural form of its unit, depending on its quantity.
+ *
+ * @param int|float $value The quantity to check against.
+ * @param string $singular The unit to use in singular form.
+ * @param string $plural The unit to use in plural form.
+ *
+ * @return string The quantity, plus the singular or plural form of its unit.
+ */
+function pluralize($value, $singular, $plural)
+{
+    return ($value == 1) ? "{$value} {$singular}" : "{$value} {$plural}";
 }
 
 
@@ -425,16 +405,267 @@ class QueryManager
     {
         global $client;
 
-        $success = call_user_func_array(array($client, 'query'), func_get_args());
-        if (!$success)
+        $success = call_user_func_array(array(__CLASS__, 'query'), func_get_args());
+        return $success ? $client->getResponse() : false;
+    }
+}
+
+
+/**
+ * Utility class for text formatting (not associated with chat).
+ */
+class Text
+{
+    /**
+     * Finds and replaces formatting tags in a string using a callback function.
+     *
+     * @param string $text The text to modify.
+     * @param Callable $callback A function to replace found tags with. It must support at least one
+     * argument, the argument being the tag string that was found. Its capitalization is unaltered.
+     * For tags except `$000`-`$fff`, `$g`, `$m` and `$z`, a second argument is used; a boolean
+     * indicating whether it is the opening tag or not. The function should return a string; the
+     * replacement for the given tag.
+     *
+     * @return string The input string with tags replaced according to the callback function.
+     */
+    public static function findAndReplaceCallback($text, $callback)
+    {
+        $index = 0;
+        $length = strlen($text);
+        $result = '';
+        $openedTags = array();
+        while ($index < $length)
         {
-            self::handleError($methodName);
-            return false;
+            $current = $text[$index];
+            if ($current === '$')
+            {
+                if ($index === $length - 1)
+                {
+                    return $result;
+                }
+                else
+                {
+                    $next = $text[$index + 1];
+                    if (preg_match('/[0-9a-f]/i', $next))
+                    {
+                        $result .= $callback(substr($text, $index, 4), null);
+                        $index += 4;
+                    }
+                    elseif (preg_match('/[gmz]/i', $next))
+                    {
+                        if ($next === 'z') $openedTags = array();
+                        $result .= $callback('$' . $next, null);
+                        $index += 2;
+                    }
+                    elseif ($next === '$')
+                    {
+                        $result .= '$$';
+                        $index += 2;
+                    }
+                    else
+                    {
+                        $tag = '$' . $next;
+                        $openedTags[$tag] = isset($openedTags[$tag]) ? !$openedTags[$tag] : true;
+                        $result .= $callback($tag, $openedTags[$tag]);
+                        $index += 2;
+                    }
+                }
+            }
+            else
+            {
+                $result .= $text[$index];
+                $index += 1;
+            }
         }
-        else
+        return $result;
+    }
+
+    /**
+     * Finds and replaces the given formatting tag in a string.
+     *
+     * @param string $text The text to modify.
+     * @param string $search The formatting tag to find.
+     * @param string $replace The string to replace the tag with.
+     *
+     * @return string The input string with occurrences of the tag replaced with the given
+     * replacement.
+     */
+    public static function findAndReplace($text, $search, $replace)
+    {
+        $search = strtolower($search);
+        $callback = function($tag) use($search, $replace)
         {
-            return $client->getResponse();
-        }
+            if (strtolower($tag) === $search) return $replace;
+            else return $tag;
+        };
+        return self::findAndReplaceCallback($text, $callback);
+    }
+
+    /**
+     * Removes all formatting in a string.
+     *
+     * @param string $text The text to remove formatting from.
+     *
+     * @return string The unformatted equivalent of the input text.
+     */
+    public static function clean($text)
+    {
+        return self::findAndReplaceCallback($text, function() { return ''; });
+    }
+
+    /**
+     * Inverts the effect of a given formatting tag or a combination of formatting tags.
+     *
+     * Using the returned value of this function will 'undo' the changes applied by the parameter
+     * string (with the exception of `$g`, `$m` and `$z`). Examples:
+     *
+     * - `$s` -> `$s`
+     * - `$w` -> `$m`
+     * - `$aaa` -> `$g`
+     * - `$w$aaa` -> `$m$g`
+     *
+     * @param string $style A formatting tag or a combination of formatting tags to invert the
+     * effect of. The string must only contain valid formatting tags; text and `$$` will not be
+     * filtered out.
+     *
+     * @return string A string that inverts the effect given by the parametered string.
+     */
+    public static function invert($style)
+    {
+        $search = array('/\$[gmz]/i', '/\$n/i', '/\$w/i', '/\$[0-9a-f].{0,2}/i');
+        $replace = array("", "\$m", "\$m", "\$g");
+        return preg_replace($search, $replace, $style);
+    }
+
+    private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
+    {
+        $highlight_inv = self::findAndReplace(self::invert($highlight), '$g', $baseColor);
+        $callback = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight, $highlight_inv)
+        {
+            switch (strtolower($tag))
+            {
+                case '$g':
+                    return $baseColor;
+                case '$x':
+                    return $isOpeningTag ? $highlight : $highlight_inv;
+                case '$z':
+                    return sprintf('$z%s%s', $baseStyle, $baseColor);
+                default:
+                    return $tag;
+            }
+        };
+        Log::debug(sprintf('before: %s', $text));
+        $formatted = self::findAndReplaceCallback($text, $callback);
+        Log::debug(sprintf('after: %s', $formatted));
+        if ($startWithBaseStyle) return "{$baseStyle}{$baseColor}{$formatted}";
+        else return "{$baseColor}{$formatted}";
+    }
+
+    /**
+     * Formats the text as an announcement.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the base color used by this function
+     * - `$x`: will toggle the highlight color or styling
+     * - `$z`: restores back to the base style + base color used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $baseColor [Optional] The base color to be used and to replace `$g` with. If
+     * null, a default green color is used.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
+     * @param string $baseStyle [Optional] The base styling to be used in the text and to be added
+     * when `$z` is used. If null, a default shadow is applied.
+     * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
+     * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
+     */
+    public static function announce($text, $baseColor = null, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
+    {
+        if (is_null($baseColor)) $baseColor = '$0f0';
+        if (is_null($highlight)) $highlight = '$fff';
+        if (is_null($baseStyle)) $baseStyle = '$s';
+        return self::format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle);
+    }
+
+    /**
+     * Formats the text as an error.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the base color used by this function
+     * - `$x`: will toggle the highlight color or styling
+     * - `$z`: restores back to the base style + base color used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
+     * @param string $baseStyle [Optional] The base styling to be used in the text and to be added
+     * when `$z` is used. If null, a default shadow is applied.
+     * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
+     * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
+     */
+    public static function error($text, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
+    {
+        if (is_null($highlight)) $highlight = '$fff';
+        if (is_null($baseStyle)) $baseStyle = '$s';
+        return self::format($text, '$f00', $highlight, $baseStyle, $startWithBaseStyle);
+    }
+
+    /**
+     * Formats the text as an info text.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the base color used by this function
+     * - `$x`: will toggle the highlight color or styling
+     * - `$z`: restores back to the base style + base color used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
+     * @param string $baseStyle [Optional] The base styling to be used in the text and to be added
+     * when `$z` is used. If null, a default shadow is applied.
+     * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
+     * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
+     */
+    public static function info($text, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
+    {
+        if (is_null($highlight)) $highlight = '$ff0';
+        if (is_null($baseStyle)) $baseStyle = '$s';
+        return self::format($text, '$fff', $highlight, $baseStyle, $startWithBaseStyle);
+    }
+
+    /**
+     * Formats the text as a darker-tone info text.
+     *
+     * The text may contain in-game formatting itself. Some extra rules are applied:
+     *
+     * - `$g`: will be replaced with the base color used by this function
+     * - `$x`: will toggle the highlight color or styling
+     * - `$z`: restores back to the base style + base color used by this function
+     *
+     * @param string $text The text to format.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, a default white color is used.
+     * @param string $baseStyle [Optional] The base styling to be used in the text and to be added
+     * when `$z` is used. If null, a default shadow is applied.
+     * @param bool $startWithBaseStyle [Optional] Whether $baseStyle should be applied at the
+     * beginning of the text. Set to false to apply $baseStyle only when using `$z`.
+     *
+     * @return string The formatted text.
+     */
+    public static function info2($text, $highlight = null, $baseStyle = null, $startWithBaseStyle = true)
+    {
+        if (is_null($highlight)) $highlight = '$fff';
+        if (is_null($baseStyle)) $baseStyle = '$s';
+        return self::format($text, '$aaa', $highlight, $baseStyle, $startWithBaseStyle);
     }
 }
 
@@ -444,9 +675,18 @@ class QueryManager
  */
 class Chat
 {
-    private static function sendMessage($color, $message, $logins = null)
+    const Prefix = '$ff0';
+
+    /**
+     * Writes a message to the chat.
+     *
+     * @param string $message The message to be written. May contain in-game formatting.
+     * @param array $logins [Optional] The logins of the players to send the message to. If null,
+     * the message is sent to everyone.
+     */
+    public static function write($message, $logins = null)
     {
-        $formatted = sprintf('$ff0>> %s%s', $color, str_replace('$g', $color, $message));
+        $formatted = sprintf('%s>> %s', self::Prefix, $message);
         if (is_null($logins))
         {
             QueryManager::query('ChatSendServerMessage', $formatted);
@@ -461,61 +701,71 @@ class Chat
     /**
      * Sends a formatted announcement message to the chat.
      *
-     * The message may contain in-game formatting itself. If the character sequence '$g' is used, it
-     * will be replaced with the highlight color used by this function.
+     * Formatting syntax follows the one defined in Text::announce.
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
+     * @param string $baseColor [Optional] The base color to be used and to replace `$g` with. If
+     * null, the default of Text::announce is used.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, the default of Text::announce is used.
      */
-    public static function announce($message, $logins = null, $color = '$0f0')
+    public static function announce($message, $logins = null, $baseColor = null, $highlight = null)
     {
-        self::sendMessage($color, $message, $logins);
+        $text = Text::announce($message, $baseColor, $highlight, '$s', false);
+        self::write($text, $logins);
     }
 
     /**
-     * Sends a formatted error message to the chat.
+     * Sends a red-colored, formatted error message to the chat.
      *
-     * The message may contain in-game formatting itself. If the character sequence '$g' is used, it
-     * will be replaced with the highlight color used by this function.
+     * Formatting syntax follows the one defined in Text::error.
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, the default of Text::error is used.
      */
-    public static function error($message, $logins = null)
+    public static function error($message, $logins = null, $highlight = null)
     {
-        self::sendMessage('$f00', $message, $logins);
+        $text = Text::error($message, $highlight, '$s', false);
+        self::write($text, $logins);
     }
 
     /**
-     * Sends a formatted information message to the chat.
+     * Sends a white-colored, formatted information message to the chat.
      *
-     * The message may contain in-game formatting itself. If the character sequence '$g' is used, it
-     * will be replaced with the highlight color used by this function.
+     * Formatting syntax follows the one defined in Text::info.
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, the default of Text::info is used.
      */
-    public static function info($message, $logins = null)
+    public static function info($message, $logins = null, $highlight = null)
     {
-        self::sendMessage('$fff', $message, $logins);
+        $text = Text::info($message, $highlight, '$s', false);
+        self::write($text, $logins);
     }
 
     /**
-     * Sends a formatted information message with a darker tone to the chat.
+     * Sends a grey-colored, formatted information message to the chat.
      *
-     * The message may contain in-game formatting itself. If the character sequence '$g' is used, it
-     * will be replaced with the highlight color used by this function.
+     * Formatting syntax follows the one defined in Text::info2.
      *
      * @param string $message The message to be written.
      * @param array $logins [Optional] The logins of the players to send the message to. If null,
      * the message is sent to everyone.
+     * @param string $highlight [Optional] The highlight color or style to replace `$x` with. If
+     * null, the default of Text::info2 is used.
      */
-    public static function info2($message, $logins = null)
+    public static function info2($message, $logins = null, $highlight = null)
     {
-        self::sendMessage('$aaa', $message, $logins);
+        $text = Text::info2($message, $highlight, '$s', false);
+        self::write($text, $logins);
     }
 }
 
@@ -529,7 +779,7 @@ class Scores
     const DidNotFinish = -1;
 
     private $scores;
-    private $isAscending; // True for Stunts, false for TA and Rounds
+    private $isAscending; // True for Stunts (points), false for TA and Rounds (round times)
 
     /**
      * Creates an empty scores instance.
@@ -543,19 +793,24 @@ class Scores
 
     private function getComparator()
     {
-        return $this->isAscending
-            ? function($a, $b)
+        if ($this->isAscending)
+        {
+            return function($a, $b)
             {
                 if ($b['Score'] <= 0) return -1;
                 elseif ($a['Score'] <= 0) return 1;
                 else return $a['Score'] < $b['Score'] ? -1 : 1;
-            }
-            : function($a, $b)
+            };
+        }
+        else
+        {
+            return function($a, $b)
             {
                 if ($b['Score'] <= 0) return -1;
                 elseif ($a['Score'] <= 0) return 1;
                 else return $a['Score'] > $b['Score'] ? -1 : 1;
             };
+        }
     }
 
     /**
@@ -1186,11 +1441,6 @@ class UI
 
     private static function scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers)
     {
-        if (!is_array($scores)) Log::warning(sprintf('scoreboardManialink: expected array $scores but got %s (%s)', $scores, gettype($scores)));
-        if (!is_int($gameMode)) Log::warning(sprintf('scoreboardManialink: expected int $gameMode but got %s (%s)', $gameMode, gettype($gameMode)));
-        if (!is_int($numberOfKOs)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfKOs but got %s (%s)', $numberOfKOs, gettype($numberOfKOs)));
-        if (!is_int($numberOfPlayers)) Log::warning(sprintf('scoreboardManialink: expected int $numberOfPlayers but got %s (%s)', $numberOfPlayers, gettype($numberOfPlayers)));
-
         $pointOfNoReturn = $numberOfPlayers - $numberOfKOs;
         $getPlacementColor = function($score, $index) use($pointOfNoReturn)
         {
@@ -1516,13 +1766,13 @@ class KOMultiplier
             case self::None:
                 return 'None';
             case self::Constant:
-                return sprintf('Constant (%d %s per round)', $this->value, $this->value === 1 ? 'KO' : 'KOs');
+                return sprintf('Constant (%s per round)', pluralize($this->value, 'KO', 'KOs'));
             case self::Extra:
-                return sprintf('Extra (KO per %d %s)', $this->value, $this->value === 1 ? 'player' : 'players');
+                return sprintf('Extra (KO per %s)', pluralize($this->value, 'player', 'players'));
             case self::Dynamic:
-                return sprintf('Dynamic (aiming for %d %s)', $this->value, $this->value === 1 ? 'round' : 'rounds');
+                return sprintf('Dynamic (aiming for %s)', pluralize($this->value, 'round', 'rounds'));
             case self::Tiebreaker:
-                return sprintf('Tiebreaker (%d %s remaining)', $this->value, $this->value === 1 ? 'KO' : 'KOs');
+                return sprintf('Tiebreaker (%s remaining)', pluralize($this->value, 'KO', 'KOs'));
             default:
                 Log::warning(
                     'KO multiplier is in unknown state (%s, %d)',
@@ -2012,7 +2262,7 @@ class KnockoutRuntime
             $this->defaultPointPartition = $CustomPoints;
         }
 
-        Chat::info(sprintf('Knockout plugin $fff%s$g loaded', Version));
+        Chat::info(sprintf('Knockout plugin %s loaded', Version));
     }
 
     private function getPlayersWithHudOn()
@@ -2049,7 +2299,7 @@ class KnockoutRuntime
         $playersWithHudOn = array();
         if ($login !== null)
         {
-            if (hasHudOn($login))
+            if (isOnServer($login) && hasHudOn($login))
             {
                 $playersWithHudOn = array($this->playerList->get($login));
             }
@@ -2079,7 +2329,7 @@ class KnockoutRuntime
         $playersWithHudOff = array();
         if ($login !== null)
         {
-            if (!hasHudOn($login))
+            if (isOnServer($login) && !hasHudOn($login))
             {
                 $playersWithHudOff = array($this->playerList->get($login));
             }
@@ -2110,14 +2360,12 @@ class KnockoutRuntime
                     Chat::announce('Knockout Tiebreaker', $playersWithHudOff, '$f00');
                     break;
                 case KnockoutStatus::Running:
-                    Chat::announce(sprintf('Knockout Round $fff%d', $this->roundNumber), $playersWithHudOff);
+                    Chat::announce(sprintf('Knockout Round $x%d', $this->roundNumber), $playersWithHudOff);
                     Chat::info(
                         sprintf(
-                            '$fff%d$g %s remaining, $fff%d$g %s this round',
-                            count($this->playerList->getPlaying()),
-                            count($this->playerList->getPlaying()) === 1 ? 'player' : 'players',
-                            $this->kosThisRound,
-                            $this->kosThisRound === 1 ? 'KO' : 'KOs'
+                            '%s remaining, %s this round',
+                            pluralize(count($this->playerList->getPlaying()), 'player', 'players'),
+                            pluralize($this->kosThisRound, 'KO', 'KOs')
                         ),
                         $playersWithHudOff
                     );
@@ -2448,8 +2696,8 @@ class KnockoutRuntime
         {
             forceSpec(array($login), true);
             $msg = $score > 0
-                ? sprintf('%s$z$s$g has been KO\'d by a worst place finish', $nickName)
-                : sprintf('%s$z$s$g has been KO\'d by a DNF', $nickName);
+                ? sprintf('$x%s$z is KO by a worst place finish', $nickName)
+                : sprintf('$x%s$z is KO by a DNF', $nickName);
             Chat::info($msg);
             if (PlayerStatus::isDisconnected($player['Status']))
             {
@@ -2460,8 +2708,8 @@ class KnockoutRuntime
         {
             $lives = $player['Lives'] - 1;
             $msg = $score > 0
-                ? sprintf('%s$z$s$g lost a life by a worst place finish ($fff%d$g remaining)', $nickName, $lives)
-                : sprintf('%s$z$s$g lost a life by a DNF ($fff%d$g remaining)', $nickName, $lives);
+                ? sprintf('$x%s$z lost a life by a worst place finish (%d remaining)', $nickName, $lives)
+                : sprintf('$x%s$z lost a life by a DNF (%d remaining)', $nickName, $lives);
             Chat::info($msg);
         }
         $this->updateStatusBar($login);
@@ -2565,7 +2813,7 @@ class KnockoutRuntime
             QueryManager::query('SetNextChallengeIndex', $nextChallengeIndex + 1);
             $nbSkips++;
             Chat::info(sprintf(
-                'Skipping %s$z$s$g as %s$z$s$g is still in the KO (%d/%d)',
+                'Skipping $x%s$z as $x%s$z is still participating (%d/%d)',
                 $nextChallenge['Name'],
                 $nextAuthor['NickName'],
                 $nbSkips,
@@ -2618,7 +2866,7 @@ class KnockoutRuntime
             $player = $this->playerList->get($login);
             if (!is_null($player))
             {
-                $nickNames[] = sprintf('%s$z$s$g', $player['NickName']);
+                $nickNames[] = sprintf('$x%s$z', $player['NickName']);
             }
         }
         Chat::info(sprintf('%s have tied for last place - initiating tiebreaker...', implode(', ', $nickNames)));
@@ -2950,6 +3198,7 @@ class KnockoutRuntime
         $login = $args[0];
         $joinsAsSpectator = $args[1];
         $playerInfo = QueryManager::queryWithResponse('GetPlayerInfo', $login);
+        $didJoin = false;
         // Only disconnected players who are eligible to rejoin should be matched here; see
         // onPlayerDisconnect
         if ($this->playerList->exists($login))
@@ -2968,6 +3217,7 @@ class KnockoutRuntime
                 case PlayerStatus::PlayingAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Playing);
                     forcePlay(array($login), true);
+                    $didJoin = true;
                     break;
 
                 case PlayerStatus::Shelved:
@@ -2976,6 +3226,7 @@ class KnockoutRuntime
                 case PlayerStatus::ShelvedAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Shelved);
                     forceSpec(array($login), true);
+                    $didJoin = true;
                     break;
 
                 case PlayerStatus::OptingOut:
@@ -2993,6 +3244,7 @@ class KnockoutRuntime
             $this->playerList->add($playerInfo['Login'], $playerInfo['NickName'], PlayerStatus::Playing, $this->lives);
             forcePlay(array($login), true);
             $this->updateKoCount();
+            $didJoin = true;
         }
         else
         {
@@ -3002,7 +3254,7 @@ class KnockoutRuntime
                 $joinsAsSpectator ? PlayerStatus::KnockedOutAndSpectating : PlayerStatus::KnockedOut,
                 0
             );
-            if ($this->openWarmup && ($this->isWarmup || $this->isPodium) && !$joinsAsSpectator)
+            if ($this->openWarmup && $this->isWarmup && !$joinsAsSpectator)
             {
                 forcePlay(array($login), false);
             }
@@ -3015,7 +3267,14 @@ class KnockoutRuntime
         {
             $this->updateStatusBar($login);
             $this->announceRoundInChat($login);
-            Chat::info('You have entered a match in progress!', array($login));
+            if ($didJoin)
+            {
+                Chat::info('You rejoined in time! Gogogo', array($login));
+            }
+            else
+            {
+                Chat::info('You have entered a match in progress', array($login));
+            }
         }
     }
 
@@ -3104,7 +3363,15 @@ class KnockoutRuntime
         switch ($this->koStatus)
         {
             case KnockoutStatus::Idle:
-                return;
+            case KnockoutStatus::Starting:
+            case KnockoutStatus::StartingNow:
+            case KnockoutStatus::Warmup:
+            case KnockoutStatus::SkippingWarmup:
+            case KnockoutStatus::SkippingTrack:
+            case KnockoutStatus::RestartingRound:
+            case KnockoutStatus::RestartingTrack:
+                // Do nothing
+                break;
 
             case KnockoutStatus::Running:
             case KnockoutStatus::Tiebreaker:
@@ -3283,7 +3550,7 @@ class KnockoutRuntime
                 elseif (count($playersInTheKO) === 1)
                 {
                     $winner = array_pop($playersInTheKO);
-                    Chat::info(sprintf('%s$z$s$g is the Champ!', $winner['NickName']));
+                    Chat::info(sprintf('$x%s$z is the Champ!', $winner['NickName']));
                     $this->stop();
                 }
                 else
@@ -3320,7 +3587,7 @@ class KnockoutRuntime
                         elseif (count($remainingPlayers) === 1)
                         {
                             $winner = array_pop($remainingPlayers);
-                            Chat::info(sprintf('%s$z$s$g is the Champ!', $winner['NickName']));
+                            Chat::info(sprintf('$x%s$z is the Champ!', $winner['NickName']));
                             $this->stop();
                         }
                         else
@@ -3376,7 +3643,7 @@ class KnockoutRuntime
                 {
                     $this->scores->reset();
                     UI::hideScoreboard();
-                    $playerCount = count($this->playerList->getAll());
+                    $playerCount = count($this->playerList->getPlaying());
                     if ($playerCount <= $this->authorSkip)
                     {
                         $this->replaceNextTrackIfNeeded();
@@ -3407,15 +3674,14 @@ class KnockoutRuntime
             return $bool ? 'on' : 'off';
         };
         $settings = array(
-            sprintf('KO mode: $fff%s$g', getNameOfConstant($this->koMode, 'KnockoutMode')),
-            sprintf('KO multiplier: $fff%s$g', $this->koMultiplier->toString()),
-            sprintf('Lives: $fff%d$g', $this->lives),
-            sprintf('Open warmup: $fff%s$g', $printBool($this->openWarmup)),
-            sprintf('Tiebreakers: $fff%s$g', $printBool($this->tiebreaker)),
-            sprintf('False starts: $fff%s$g', ($this->maxFalseStarts === 0 ? 'off' : var_export($this->maxFalseStarts, true))),
-            sprintf('Author skip: $fff%s$g', ($this->authorSkip < 2 ? 'off' : 'for top ' . var_export($this->authorSkip, true)))
+            sprintf('KO mode: $x%s$x', getNameOfConstant($this->koMode, 'KnockoutMode')),
+            sprintf('KO multiplier: $x%s$x', $this->koMultiplier->toString()),
+            sprintf('Lives: $x%d$x', $this->lives),
+            sprintf('Open warmup: $x%s$x', $printBool($this->openWarmup)),
+            sprintf('Tiebreakers: $x%s$x', $printBool($this->tiebreaker)),
+            sprintf('False starts: $x%s$x', ($this->maxFalseStarts === 0 ? 'off' : var_export($this->maxFalseStarts, true))),
+            sprintf('Author skip: $x%s$x', ($this->authorSkip < 2 ? 'off' : 'for top ' . var_export($this->authorSkip, true)))
         );
-        $mode = QueryManager::queryWithResponse('GetNextGameInfo');
         return implode(' | ', $settings);
     }
 
@@ -3499,7 +3765,7 @@ class KnockoutRuntime
         }
         elseif (count($args) === 0)
         {
-            $onError('Syntax error: expected an argument (see $fff/ko help$g for usages)');
+            $onError('Syntax error: expected an argument (see $x/ko help$x for usages)');
         }
         else
         {
@@ -3514,7 +3780,7 @@ class KnockoutRuntime
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments ($fff%s$g, expected $fff/ko start$g or $fff/ko start now$g)');
+                        $onError('Syntax error: too many arguments ($x%s$x, expected $x/ko start$x or $x/ko start now$x)');
                     }
                     elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
                     {
@@ -3544,7 +3810,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('Syntax error: unexpected argument $fff%s$g (expected $fff/ko start$g or $fff/ko start now$g)', $args[1]));
+                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko start$x or $x/ko start now$x)', $args[1]));
                     }
                     break;
 
@@ -3552,7 +3818,7 @@ class KnockoutRuntime
                 case 'stop':
                     if (isset($args[1]))
                     {
-                        $onError('Syntax error: too many arguments ($fff%s$g, expected $fff/ko stop$g)');
+                        $onError('Syntax error: too many arguments ($x%s$x, expected $x/ko stop$x)');
                     }
                     elseif ($this->koStatus === KnockoutStatus::Idle)
                     {
@@ -3575,7 +3841,7 @@ class KnockoutRuntime
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko skip$g or $fff/ko skip warmup$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko skip$x or $x/ko skip warmup$x)');
                     }
                     elseif (!isset($args[1]))
                     {
@@ -3610,7 +3876,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('Unexpected argument $fff%s$g (expected $fff/ko skip$g or $fff/ko skip warmup$g)', $args[1]));
+                        $onError(sprintf('Unexpected argument $x%s$x (expected $x/ko skip$x or $x/ko skip warmup$x)', $args[1]));
                     }
                     break;
 
@@ -3622,7 +3888,7 @@ class KnockoutRuntime
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko restart$g or $fff/ko restart warmup$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko restart$x or $x/ko restart warmup$x)');
                     }
                     elseif (!isset($args[1]))
                     {
@@ -3653,11 +3919,11 @@ class KnockoutRuntime
                             $this->updateStatusBar();
                         }
                         $this->restartTrack();
-                        Chat::info('Restarting the track with a warmup');
+                        Chat::info('Restarting the track');
                     }
                     else
                     {
-                        $onError(sprintf('Syntax error: unexpected argument $fff%s$g (expected $fff/ko restart$g or $fff/ko restart warmup$g)', $args[1]));
+                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko restart$x or $x/ko restart warmup$x)', $args[1]));
                     }
                     break;
 
@@ -3669,11 +3935,11 @@ class KnockoutRuntime
                     }
                     elseif (!isset($args[1]))
                     {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko add (<login> | *)$g)');
+                        $onError('Syntax error: expected an argument (usage: $x/ko add (<login> | *)$x)');
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko add (<login> | *)$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko add (<login> | *)$x)');
                     }
                     else
                     {
@@ -3688,7 +3954,7 @@ class KnockoutRuntime
                         }
                         else
                         {
-                            $onError(sprintf('Error: login $fff%s$g could not be found', $args[1]));
+                            $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
                             return;
                         }
 
@@ -3704,7 +3970,7 @@ class KnockoutRuntime
                             }
                             else
                             {
-                                $onError(sprintf('$fff%s$g is already playing', $args[1]));
+                                $onError(sprintf('$x%s$x is already playing', $args[1]));
                             }
                         }
                         else
@@ -3716,7 +3982,7 @@ class KnockoutRuntime
                             }
                             else
                             {
-                                Chat::info(sprintf('%s$z$s$g has been added to the KO', $playersToAdd[0]['NickName']));
+                                Chat::info(sprintf('$x%s$z has been added to the KO', $playersToAdd[0]['NickName']));
                             }
                         }
                     }
@@ -3732,11 +3998,11 @@ class KnockoutRuntime
                     }
                     elseif (!isset($args[1]))
                     {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko remove (<login> | *)$g)');
+                        $onError('Syntax error: expected an argument (usage: $x/ko remove (<login> | *)$x)');
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko remove (<login> | *)$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko remove (<login> | *)$x)');
                     }
                     else
                     {
@@ -3751,7 +4017,7 @@ class KnockoutRuntime
                         }
                         else
                         {
-                            $onError(sprintf('Error: login $fff%s$g could not be found', $args[1]));
+                            $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
                             return;
                         }
 
@@ -3769,7 +4035,7 @@ class KnockoutRuntime
                                 }
                                 else
                                 {
-                                    $onError(sprintf('$fff%s$g is already knocked out', $args[1]));
+                                    $onError(sprintf('$x%s$x is already knocked out', $args[1]));
                                 }
                             }
                             else
@@ -3781,7 +4047,7 @@ class KnockoutRuntime
                                 }
                                 else
                                 {
-                                    Chat::info(sprintf('%s$z$s$g has been removed from the KO', $playersToRemove[0]['NickName']));
+                                    Chat::info(sprintf('$x%s$z has been removed from the KO', $playersToRemove[0]['NickName']));
                                 }
                             }
                         }
@@ -3799,7 +4065,7 @@ class KnockoutRuntime
                                 }
                                 else
                                 {
-                                    $onError(sprintf('$fff%s$g is already spectating', $args[1]));
+                                    $onError(sprintf('$x%s$x is already spectating', $args[1]));
                                 }
                             }
                             else
@@ -3811,7 +4077,7 @@ class KnockoutRuntime
                                 }
                                 else
                                 {
-                                    Chat::info(sprintf('%s$z$s$g has been put to spec', $playersToRemove[0]['NickName']));
+                                    Chat::info(sprintf('$x%s$z has been put to spec', $playersToRemove[0]['NickName']));
                                 }
                             }
                         }
@@ -3822,11 +4088,11 @@ class KnockoutRuntime
                 case 'lives':
                     if (!isset($args[1]))
                     {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko lives (<login> | *) [[+ | -]<lives>]$g)');
+                        $onError('Syntax error: expected an argument (usage: $x/ko lives (<login> | *) [[+ | -]<lives>]$x)');
                     }
                     elseif (isset($args[3]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko lives (<login> | *) [[+ | -]<lives>]$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko lives (<login> | *) [[+ | -]<lives>]$x)');
                     }
                     else
                     {
@@ -3846,7 +4112,7 @@ class KnockoutRuntime
                         }
                         else
                         {
-                            $onError(sprintf('Error: login $fff%s$g could not be found', $args[1]));
+                            $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
                             return;
                         }
 
@@ -3860,7 +4126,7 @@ class KnockoutRuntime
                             else
                             {
                                 $msg = implode(', ', array_map(
-                                    function ($player) { return sprintf('%s$z$s$g (%s)', $player['NickName'], $player['Lives']); },
+                                    function ($player) { return sprintf('$x%s$z (%s)', $player['NickName'], $player['Lives']); },
                                     $playersToUpdate
                                 ));
                                 Chat::info2($msg, array($issuerLogin));
@@ -3868,20 +4134,20 @@ class KnockoutRuntime
                         }
                         elseif (!is_numeric($args[2]))
                         {
-                            $onError(sprintf('Error: argument $fff%s$g is not a number', $args[2]));
+                            $onError(sprintf('Error: argument $x%s$x is not a number', $args[2]));
                         }
                         elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                         {
-                            $onError(sprintf('Error: floating point numbers ($fff%s$g) are not supported', $args[2]));
+                            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
                         }
                         else
                         {
                             $sign = substr($args[2], 0, 1);
                             $value = abs((int) $args[2]);
-                            $livesStr = $value === 1 ? 'life' : 'lives';
+                            $livesStr = pluralize($value, 'life', 'lives');
                             if ($value === 0)
                             {
-                                $onError(sprintf('Error: argument $fff%d$g must be a non-zero value', $value));
+                                $onError(sprintf('Error: argument $x%d$x must be a non-zero value', $value));
                             }
                             elseif ($sign === '+' || $sign === '-')
                             {
@@ -3892,7 +4158,7 @@ class KnockoutRuntime
                                 {
                                     if (KnockoutStatus::isInProgress($this->koStatus))
                                     {
-                                        Chat::info(sprintf('All players have been %s %d %s', $actionStr, $value, $livesStr));
+                                        Chat::info(sprintf('All players have been %s %s', $actionStr, $livesStr));
                                     }
                                     else
                                     {
@@ -3903,7 +4169,7 @@ class KnockoutRuntime
                                 else
                                 {
                                     $target = $this->playerList->get($args[1]);
-                                    Chat::info(sprintf('%s$z$s$g has been %s %d %s (currently at %d)', $target['NickName'], $actionStr, $value, $livesStr, $target['Lives']));
+                                    Chat::info(sprintf('$x%s$z has been %s %s (currently at %d)', $target['NickName'], $actionStr, $livesStr, $target['Lives']));
                                 }
                             }
                             else
@@ -3914,7 +4180,7 @@ class KnockoutRuntime
                                 {
                                     if (KnockoutStatus::isInProgress($this->koStatus))
                                     {
-                                        Chat::info(sprintf('All players have now %d %s', $value, $livesStr));
+                                        Chat::info(sprintf('All players have now %s', $livesStr));
                                     }
                                     else
                                     {
@@ -3923,7 +4189,7 @@ class KnockoutRuntime
                                 }
                                 else
                                 {
-                                    Chat::info(sprintf('%s$z$s$g has now %d %s', $playersToUpdate[0]['NickName'], $value, $livesStr));
+                                    Chat::info(sprintf('$x%s$z has now %s', $playersToUpdate[0]['NickName'], $livesStr));
                                 }
                             }
                         }
@@ -3943,12 +4209,12 @@ class KnockoutRuntime
                             case 'none':
                                 if (isset($args[2]))
                                 {
-                                    $onError('Syntax error: too many arguments (usage: $fff/ko multi none$g)');
+                                    $onError('Syntax error: too many arguments (usage: $x/ko multi none$x)');
                                 }
                                 else
                                 {
                                     $this->koMultiplier->set(KOMultiplier::None, null);
-                                    Chat::info(sprintf('KO multiplier set to $fff%s$g', $this->koMultiplier->toString()));
+                                    Chat::info(sprintf('KO multiplier set to $x%s$x', $this->koMultiplier->toString()));
                                     $this->onKoStatusUpdate();
                                 }
                                 break;
@@ -3956,31 +4222,31 @@ class KnockoutRuntime
                             case 'constant':
                                 if (!isset($args[2]))
                                 {
-                                    $onError('Syntax error: expected an argument (usage: $fff/ko multi constant <x KOs per round>$g)');
+                                    $onError('Syntax error: expected an argument (usage: $x/ko multi constant <x KOs per round>$x)');
                                 }
                                 elseif (isset($args[3]))
                                 {
-                                    $onError('Syntax error: too many arguments (usage: $fff/ko multi constant <x KOs per round>$g)');
+                                    $onError('Syntax error: too many arguments (usage: $x/ko multi constant <x KOs per round>$x)');
                                 }
                                 elseif (!is_numeric($args[2]))
                                 {
-                                    $onError(sprintf('Syntax error: argument $fff%s$g must be a number (usage: $fff/ko multi constant <x KOs per round>$g)', $args[1]));
+                                    $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi constant <x KOs per round>$x)', $args[1]));
                                 }
                                 elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                                 {
-                                    $onError(sprintf('Error: floating point numbers ($fff%s$g) are not supported', $args[2]));
+                                    $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
                                 }
                                 else
                                 {
                                     $val = (int) $args[2];
                                     if ($val <= 0)
                                     {
-                                        $onError(sprintf('Syntax error: argument $fff%d$g must be greater than 0 (usage: $fff/ko multi constant <x KOs per round>$g)', $val));
+                                        $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi constant <x KOs per round>$x)', $val));
                                     }
                                     else
                                     {
                                         $this->koMultiplier->set(KOMultiplier::Constant, $val);
-                                        Chat::info(sprintf('KO multiplier set to $fff%s$g', $this->koMultiplier->toString()));
+                                        Chat::info(sprintf('KO multiplier set to $x%s', $this->koMultiplier->toString()));
                                         $this->onKoStatusUpdate();
                                     }
                                 }
@@ -3989,31 +4255,31 @@ class KnockoutRuntime
                             case 'extra':
                                 if (!isset($args[2]))
                                 {
-                                    $onError('Syntax error: expected an argument (usage: $fff/ko multi extra <per X players>$g)');
+                                    $onError('Syntax error: expected an argument (usage: $x/ko multi extra <per X players>$x)');
                                 }
                                 elseif (isset($args[3]))
                                 {
-                                    $onError('Syntax error: too many arguments (usage: $fff/ko multi extra <per X players>$g)');
+                                    $onError('Syntax error: too many arguments (usage: $x/ko multi extra <per X players>$x)');
                                 }
                                 elseif (!is_numeric($args[2]))
                                 {
-                                    $onError(sprintf('Syntax error: argument $fff%s$g must be a number (usage: $fff/ko multi extra <per x players>$g)', $args[1]));
+                                    $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi extra <per x players>$x)', $args[1]));
                                 }
                                 elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                                 {
-                                    $onError(sprintf('Error: floating point numbers ($fff%s$g) are not supported', $args[2]));
+                                    $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
                                 }
                                 else
                                 {
                                     $val = (int) $args[2];
                                     if ($val <= 0)
                                     {
-                                        $onError(sprintf('Syntax error: argument $fff%d$g must be greater than 0 (usage: $fff/ko multi extra <per x players>$g)', $val));
+                                        $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi extra <per x players>$x)', $val));
                                     }
                                     else
                                     {
                                         $this->koMultiplier->set(KOMultiplier::Extra, $val);
-                                        Chat::info(sprintf('KO multiplier set to $fff%s$g', $this->koMultiplier->toString()));
+                                        Chat::info(sprintf('KO multiplier set to $x%s$x', $this->koMultiplier->toString()));
                                         $this->onKoStatusUpdate();
                                     }
                                 }
@@ -4022,31 +4288,31 @@ class KnockoutRuntime
                             case 'dynamic':
                                 if (!isset($args[2]))
                                 {
-                                    $onError('Syntax error: expected an argument (usage: $fff/ko multi dynamic <X rounds>$g)');
+                                    $onError('Syntax error: expected an argument (usage: $x/ko multi dynamic <X rounds>$x)');
                                 }
                                 elseif (isset($args[3]))
                                 {
-                                    $onError('Syntax error: too many arguments (usage: $fff/ko multi dynamic <X rounds>$g)');
+                                    $onError('Syntax error: too many arguments (usage: $x/ko multi dynamic <X rounds>$x)');
                                 }
                                 elseif (!is_numeric($args[2]))
                                 {
-                                    $onError(sprintf('Syntax error: argument $fff%s$g must be a number (usage: $fff/ko multi dynamic <x rounds>$g)', $args[1]));
+                                    $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi dynamic <x rounds>$x)', $args[1]));
                                 }
                                 elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                                 {
-                                    $onError(sprintf('Error: floating point numbers ($fff%s$g) are not supported', $args[2]));
+                                    $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
                                 }
                                 else
                                 {
                                     $val = (int) $args[2];
                                     if ($val <= 0)
                                     {
-                                        $onError(sprintf('Syntax error: argument $fff%d$g must be greater than 0 (usage: $fff/ko multi dynamic <x rounds>$g)', $val));
+                                        $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi dynamic <x rounds>$x)', $val));
                                     }
                                     else
                                     {
                                         $this->koMultiplier->set(KOMultiplier::Dynamic, $val);
-                                        Chat::info(sprintf('KO multiplier set to $fff%s$g', $this->koMultiplier->toString()));
+                                        Chat::info(sprintf('KO multiplier set to $x%s', $this->koMultiplier->toString()));
                                         $this->onKoStatusUpdate();
                                     }
                                 }
@@ -4055,11 +4321,11 @@ class KnockoutRuntime
                             default:
                                 if (isset($args[1]))
                                 {
-                                    $onError(sprintf('Syntax error: unexpected argument $fff%s$g (expected $fffconstant$g, $fffextra$g or $fffnone$g)', $args[1]));
+                                    $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $xconstant$x, $xextra$x or $xnone$x)', $args[1]));
                                 }
                                 else
                                 {
-                                    $onError('Syntax error: expected an argument (usage: $fff/ko multi (constant <x KOs per round> | extra <per x players> | dynamic <x rounds> | none)$g)');
+                                    $onError('Syntax error: expected an argument (usage: $x/ko multi (constant <x KOs per round> | extra <per x players> | dynamic <x rounds> | none)$x)');
                                 }
                                 break;
                         }
@@ -4070,11 +4336,11 @@ class KnockoutRuntime
                 case 'openwarmup':
                     if (!isset($args[1]))
                     {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko openwarmup (on | off)$g)');
+                        $onError('Syntax error: expected an argument (usage: $x/ko openwarmup (on | off)$x)');
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko openwarmup (on | off)$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko openwarmup (on | off)$x)');
                     }
                     elseif ($args[1] === 'on')
                     {
@@ -4090,7 +4356,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('Error: unexpected argument $fff%s$g (expected $fffon$g or $fffoff$g)', $args[1]));
+                        $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
                     }
                     break;
 
@@ -4098,34 +4364,34 @@ class KnockoutRuntime
                 case 'falsestart':
                     if (!isset($args[1]))
                     {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko falsestart <max tries>$g)');
+                        $onError('Syntax error: expected an argument (usage: $x/ko falsestart <max tries>$x)');
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko falsestart <max tries>$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko falsestart <max tries>$x)');
                     }
                     elseif (!is_numeric($args[1]))
                     {
-                        $onError(sprintf('Error: argument $fff%s$g is not a number', $args[1]));
+                        $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
                     }
                     elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
                     {
-                        $onError(sprintf('Error: floating point numbers ($fff%s$g) are not supported', $args[2]));
+                        $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
                     }
                     else
                     {
                         $val = (int) $args[1];
                         if ($val < 0)
                         {
-                            $onError(sprintf('Error: argument $fff%d$g must be 0 or greater', $val));
+                            $onError(sprintf('Error: argument $x%d$x must be 0 or greater', $val));
                         }
                         else
                         {
                             $prev = $this->maxFalseStarts;
                             $this->maxFalseStarts = $val;
                             $msg = $val === 0
-                                ? sprintf('False start detection have been disabled (previously set to $fff%d$g)', $prev)
-                                : sprintf('False start limit has been set to $fff%d$g (previously $fff%d$g)', $val, $prev);
+                                ? sprintf('False start detection have been disabled (previously set to $x%d$x)', $prev)
+                                : sprintf('False start limit has been set to $x%d$x (previously $x%d$x)', $val, $prev);
                             Chat::info($msg);
                         }
                     }
@@ -4135,11 +4401,11 @@ class KnockoutRuntime
                 case 'tiebreaker':
                     if (!isset($args[1]))
                     {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko tiebreaker (on | off)>$g)');
+                        $onError('Syntax error: expected an argument (usage: $x/ko tiebreaker (on | off)>$x)');
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko tiebreaker (on | off)$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko tiebreaker (on | off)$x)');
                     }
                     elseif ($args[1] === 'on')
                     {
@@ -4153,7 +4419,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('Error: unexpected argument $fff%s$g (expected $fffon$g or $fffoff$g)', $args[1]));
+                        $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
                     }
                     break;
 
@@ -4161,34 +4427,34 @@ class KnockoutRuntime
                 case 'authorskip':
                     if (!isset($args[1]))
                     {
-                        $onError('Syntax error: expected an argument (usage: $fff/ko authorskip <for top X players>$g)');
+                        $onError('Syntax error: expected an argument (usage: $x/ko authorskip <for top X players>$x)');
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko authorskip <for top X players>$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko authorskip <for top X players>$x)');
                     }
                     elseif (!is_numeric($args[1]))
                     {
-                        $onError(sprintf('Error: argument $fff%s$g is not a number', $args[1]));
+                        $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
                     }
                     elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
                     {
-                        $onError(sprintf('Error: floating point numbers ($fff%s$g) are not supported', $args[2]));
+                        $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
                     }
                     else
                     {
                         $val = (int) $args[1];
                         if ($val < 0)
                         {
-                            $onError(sprintf('Error: argument $fff%d$g must be 0 or greater', $val));
+                            $onError(sprintf('Error: argument $x%d$x must be 0 or greater', $val));
                         }
                         else
                         {
                             $prev = $this->authorSkip;
                             $this->authorSkip = $val;
                             $msg = $val === 0
-                                ? sprintf('Author skips have been disabled (previously set to $fff%d$g)', $prev)
-                                : sprintf('Author skip has been enabled for top $fff%d$g (previously $fff%d$g)', $val, $prev);
+                                ? sprintf('Author skips have been disabled (previously set to $x%d$x)', $prev)
+                                : sprintf('Author skip has been enabled for top $x%d$x (previously $x%d$x)', $val, $prev);
                             Chat::info($msg);
                         }
                     }
@@ -4198,7 +4464,7 @@ class KnockoutRuntime
                 case 'settings':
                     if (isset($args[1]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko settings$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko settings$x)');
                     }
                     else
                     {
@@ -4210,17 +4476,16 @@ class KnockoutRuntime
                 case 'status':
                     if (isset($args[1]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko status$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko status$x)');
                     }
                     else
                     {
                         $playerList = array_map(
                             function($player)
                             {
-                                return sprintf('%s (%s %s)',
+                                return sprintf('%s (%s)',
                                     getNameOfConstant($player['Status'], 'PlayerStatus'),
-                                    $player['Lives'],
-                                    $player['Lives'] === 1 ? 'life' : 'lives'
+                                    pluralize($player['Lives'], 'life', 'lives')
                                 );
                             },
                             $this->playerList->getAll()
@@ -4247,7 +4512,7 @@ class KnockoutRuntime
                 case 'help':
                     if (isset($args[1]))
                     {
-                        $onError('Syntax error: too many arguments (usage: $fff/ko help$g)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko help$x)');
                     }
                     else
                     {
@@ -4256,7 +4521,7 @@ class KnockoutRuntime
                     break;
 
                 default:
-                    $onError(sprintf('Syntax error: unexpected argument $fff%s$g (see $fff/ko help$g for usages)', $args[0]));
+                    $onError(sprintf('Syntax error: unexpected argument $x%s$x (see $x/ko help$x for usages)', $args[0]));
                     break;
             }
         }
@@ -4267,8 +4532,6 @@ class KnockoutRuntime
         $prefix = " \n\$s";
         $sep1 = "\n\n";
         $sep2 = "\n    ";
-        $var = '$i';
-        $endvar = '$i';
         $totalPages = 3;
 
         switch ($pageNumber)
@@ -4276,53 +4539,53 @@ class KnockoutRuntime
             case 1:
                 $text = implode($sep1, array(
                     implode($sep2, array(
-                        "/ko start [now]",
-                        'Starts the knockout. If "now" is given, the current track will be skipped.'
+                        '/ko start [now]',
+                        'Starts the knockout. If "now" is given, the current track will be skipped immediately.'
                     )),
 
                     implode($sep2, array(
-                        "/ko stop",
+                        '/ko stop',
                         'Stops the knockout with immediate effect.'
                     )),
 
                     implode($sep2, array(
-                        "/ko skip [warmup]",
+                        '/ko skip [warmup]',
                         'Skips the current track. If "warmup" is given, only the warmup is skipped.'
                     )),
 
                     implode($sep2, array(
-                        "/ko restart [warmup]",
+                        '/ko restart [warmup]',
                         'Restarts the current track, or the current round if in Rounds. If "warmup" is given, the track is',
                         'restarted with a warmup.'
                     )),
 
                     implode($sep2, array(
-                        "/ko add ({$var}login{$endvar} | *)",
+                        '/ko add ($xlogin$x | *)',
                         'Adds a player to the knockout. If the wildcard * is used, then everyone on the server is added.'
                     )),
 
                     implode($sep2, array(
-                        "/ko remove ({$var}login{$endvar} | *)",
+                        '/ko remove ($xlogin$x | *)',
                         'Removes a player from the knockout, regardless of how many lives they have.'
                     )),
 
                     implode($sep2, array(
-                        "/ko spec ({$var}login{$endvar} | *)",
+                        '/ko spec ($xlogin$x | *)',
                         'Same as /ko remove but instead puts the player into spectator status.'
                     )),
 
                     implode($sep2, array(
-                        "/ko lives ({$var}login{$endvar} | *) [[+ | -]{$var}lives{$endvar}]",
+                        '/ko lives ($xlogin$x | *) [[+ | -]$xlives$x]',
                         'Displays or adjusts the number of lives to use for the knockout.'
                     ))
                 ));
-                UI::showMultiPageDialog("{$prefix}{$text}", $logins, 1, $totalPages, null, 462);
+                UI::showMultiPageDialog(Text::info("{$prefix}{$text}", '$i', '$s', false), $logins, 1, $totalPages, null, 462);
                 break;
 
             case 2:
                 $text = implode($sep1, array(
                     implode($sep2, array(
-                        "/ko multi (constant {$var}kos{$endvar} | extra {$var}per_x_players{$endvar} | dynamic {$var}total_rounds{$endvar} | none)",
+                        '/ko multi (constant $xkos$x | extra $xper_x_players$x | dynamic $xtotal_rounds$x | none)',
                         'Sets the KO multiplier mode.',
                         '- Constant: x KOs per round',
                         '- Extra: +1 KO for every x\'th player',
@@ -4331,7 +4594,7 @@ class KnockoutRuntime
                     )),
 
                     implode($sep2, array(
-                        "/ko rounds {$var}rounds{$endvar}",
+                        '/ko rounds $xrounds$x',
                         'Sets the number of rounds per track to play in Rounds.'
                     )),
 
@@ -4341,39 +4604,39 @@ class KnockoutRuntime
                     )),
 
                     implode($sep2, array(
-                        "/ko falsestart {$var}max_tries{$endvar}",
+                        '/ko falsestart $xmax_tries$x',
                         'Sets the limit for how many times the round will be restarted if someone retires before the',
                         'countdown.'
                     )),
 
                     implode($sep2, array(
-                        "/ko tiebreaker (on | off)",
+                        '/ko tiebreaker (on | off)',
                         'Enables or disables tiebreakers, a custom mode which takes effect when multiple players tie and not',
                         'all of them would be knocked out.'
                     )),
 
                     implode($sep2, array(
-                        "/ko authorskip {$var}for_top_x_players{$endvar}",
+                        '/ko authorskip $xfor_top_x_players$x',
                         'Automatically skips a track when its author is present, once a given player count has been reached.'
                     ))
                 ));
-                UI::showMultiPageDialog("{$prefix}{$text}", $logins, 2, $totalPages, 461, 463);
+                UI::showMultiPageDialog(Text::info("{$prefix}{$text}", '$i', '$s', false), $logins, 2, $totalPages, 461, 463);
                 break;
 
             case 3:
                 $text = implode($sep1, array(
                     implode($sep2, array(
-                        "/ko settings",
+                        '/ko settings',
                         'Displays knockout settings such as multiplier, lives, open warmup, etc in the chat.'
                     )),
 
                     implode($sep2, array(
-                        "/ko status",
+                        '/ko status',
                         'Shows knockout mode, knockout status, player list and scores in a dialog window.'
                     )),
 
                     implode($sep2, array(
-                        "/ko help",
+                        '/ko help',
                         'Shows the list of commands.'
                     )),
 
@@ -4381,7 +4644,7 @@ class KnockoutRuntime
 
                     '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md]User guide$l'
                 ));
-                UI::showMultiPageDialog("{$prefix}{$text}", $logins, 3, $totalPages, 462, null);
+                UI::showMultiPageDialog(Text::info("{$prefix}{$text}", '$i', '$s', false), $logins, 3, $totalPages, 462, null);
                 break;
 
             default:
@@ -4429,7 +4692,7 @@ class KnockoutRuntime
             )),
 
             implode("\n", array(
-                'If you experience a disconnection, you may get reinstated only if you haven\'t been eliminated yet and,',
+                'If you experience a disconnection, you may get reinstated only if you haven\'t been knocked out yet and,',
                 'without missing any rounds,',
                 '    - rejoin during the warmup (Rounds, Laps)',
                 '    - rejoin with time to spare (Time Attack, Stunts)'
@@ -4466,11 +4729,11 @@ class KnockoutRuntime
         $issuerLogin = $issuer[0];
         if (!isset($args[0]))
         {
-            Chat::error('Syntax error: expected an argument (usage: $fff/opt out$g)', array($issuerLogin));
+            Chat::error('Syntax error: expected an argument (usage: $x/opt out$x)', array($issuerLogin));
         }
         elseif (isset($args[1]))
         {
-            Chat::error('Syntax error: too many arguments (usage: $fff/opt out$g)', array($issuerLogin));
+            Chat::error('Syntax error: too many arguments (usage: $x/opt out$x)', array($issuerLogin));
         }
         elseif (strtolower($args[0]) === 'in')
         {
@@ -4500,7 +4763,7 @@ class KnockoutRuntime
                         forcePlay(array($issuerLogin), true);
                     }
                     $this->onKoStatusUpdate();
-                    Chat::info(sprintf('%s$z$s$g has opted in to the knockout', $playerObj['NickName']));
+                    Chat::info(sprintf('$x%s$z has opted in to the knockout', $playerObj['NickName']));
                 }
                 else
                 {
@@ -4532,7 +4795,7 @@ class KnockoutRuntime
         }
         else
         {
-            $msg = sprintf('Syntax error: unexpected argument $fff%s$g (expected $fff/opt out$g)', $args[0]);
+            $msg = sprintf('Syntax error: unexpected argument $x%s$x (expected $x/opt out$x)', $args[0]);
             Chat::error($msg, array($issuerLogin));
         }
     }
@@ -4550,10 +4813,8 @@ class KnockoutRuntime
     {
         if (isadmin($issuer[0]))
         {
-            $this->onPlayerConnect(array(
-                'somerandomdude',
-                false
-            ));
+            $this->playerList->add('somerandomdude', 'somerandomdude', PlayerStatus::Playing, $this->lives);
+            $this->updateKoCount();
             Chat::info2('test1 done', array($issuer[0]));
         }
         else
@@ -4575,12 +4836,10 @@ class KnockoutRuntime
     {
         if (isadmin($issuer[0]))
         {
-            $chattime = QueryManager::queryWithResponse('GetChatTime');
-            QueryManager::query('SetChatTime', 0);
-            QueryManager::query('SetGameMode', GameMode::Rounds);
-            QueryManager::query('SetWarmUp', false);
-            QueryManager::query('NextChallenge');
-            QueryManager::query('SetChatTime', $chattime['NextValue']);
+            $voyScore = $this->scores->get('voyager006');
+            $this->scores->submitScore('somerandomdude', 'somerandomdude', $voyScore);
+            $this->updateScoreboard();
+            Chat::info2('test2 done', array($issuer[0]));
         }
         else
         {
@@ -4601,8 +4860,9 @@ class KnockoutRuntime
     {
         if (isadmin($issuer[0]))
         {
-            $scoresPartition = array(-1, -2);
-            QueryManager::query('SetRoundCustomPoints', $scoresPartition, true);
+            $this->scores->submitScore('somerandomdude', 'somerandomdude', 0);
+            $this->updateScoreboard();
+            Chat::info2('test3 done', array($issuer[0]));
         }
         else
         {
@@ -4659,7 +4919,7 @@ class KnockoutRuntime
                 }
                 forceSpec(array($login), true);
                 $this->onKoStatusUpdate();
-                Chat::info(sprintf('%s$z$s$g has opted out of the knockout', $playerObj['NickName']));
+                Chat::info(sprintf('$x%s$z has opted out of the knockout', $playerObj['NickName']));
                 break;
 
             case 461:
