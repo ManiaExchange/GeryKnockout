@@ -336,8 +336,8 @@ class QueryManager
     {
         global $client;
 
-        $method = $methodName === null ? '' : sprintf('%s ', $methodName);
-        $msg = sprintf("Client query %sfailed with code %d: %s", $method, $client->getErrorCode(), $client->getErrorMessage());
+        $subject = is_null($methodName) ? 'Client query' : "Client query {$methodName}";
+        $msg = sprintf("%s failed with code %d: %s", $subject, $client->getErrorCode(), $client->getErrorMessage());
         Log::error($msg);
         $client->resetError();
     }
@@ -2353,7 +2353,7 @@ class KnockoutRuntime
                     $printPlayerStatus();
                     break;
                 case KnockoutStatus::Running:
-                    Chat::announce(sprintf('Knockout Round $x%d', $this->roundNumber), $logins);
+                    Chat::announce("Knockout Round \$x{$this->roundNumber}", $logins);
                     $printKoStatus($this->playerList->getPlaying(), $this->kosThisRound);
                     $printPlayerStatus();
                     break;
