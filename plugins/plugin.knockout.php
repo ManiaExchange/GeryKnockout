@@ -2560,11 +2560,12 @@ class KnockoutRuntime
             }
         }
 
-        if ($this->koStatus === KnockoutStatus::Tiebreaker)
+        if (count($playersToRemove) > 1 && $this->koStatus === KnockoutStatus::Tiebreaker)
         {
             $this->returnFromTiebreaker();
         }
-        elseif ($status === PlayerStatus::KnockedOut && $this->openWarmup && ($this->isWarmup || $this->isPodium))
+
+        if ($status === PlayerStatus::KnockedOut && $this->openWarmup && $this->isWarmup)
         {
             forcePlay(logins($playersToRemove), false);
         }
@@ -2588,7 +2589,7 @@ class KnockoutRuntime
             if ($remainingLives <= 0)
             {
                 // Knocked out
-                if ($this->openWarmup && ($this->isWarmup || $this->isPodium))
+                if ($this->openWarmup && $this->isWarmup)
                 {
                     $toPlay[] = $player['Login'];
                 }
@@ -2866,22 +2867,6 @@ class KnockoutRuntime
         $this->koMultiplier->revert();
         forcePlay(logins($remainingPlayers), true);
         $this->koStatus = KnockoutStatus::Running;
-    }
-
-    /**
-     * Returns the player with the most points in this match.
-     */
-    private function getLeadingPlayer()
-    {
-        $scores = QueryManager::queryWithResponse('GetCurrentRanking', 255, 0);
-        foreach ($scores as $score)
-        {
-            if ($score['Rank'] === 1)
-            {
-                return $score;
-            }
-        }
-        return null;
     }
 
     /**
