@@ -3737,7 +3737,6 @@ class KnockoutRuntime
                     if ($this->koStatus !== KnockoutStatus::Idle)
                     {
                         $onError('There is already a knockout in progress');
-                        return;
                     }
                     elseif (isset($args[2]))
                     {
@@ -3745,29 +3744,26 @@ class KnockoutRuntime
                     }
                     elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
                     {
-                        // Todo: look up on next round's infos with GetNextGameInfo
                         $mode = QueryManager::queryWithResponse('GetGameMode');
+                        $players = QueryManager::queryWithResponse('GetPlayerList', 255, 0, 1);
                         if ($mode === GameMode::Team)
                         {
                             $onError('Knockout does not work in Team mode');
-                            return;
                         }
                         elseif ($mode === GameMode::Cup)
                         {
                             $onError('Knockout does not work in Cup mode');
-                            return;
                         }
-
-                        $players = QueryManager::queryWithResponse('GetPlayerList', 255, 0, 1);
                         // only 1 player? WTF!?! MrA demands moarrr
-                        // if (count($players) <= 1) {
-                        //     $onError('Knockout requires multiple players');
-                        //     return;
-                        // }
-
-                        $this->start($players, isset($args[1]) && $args[1] === 'now');
-                        Chat::info2('Knockout starting with the following settings:', $issuerLogin);
-                        Chat::info2($this->printSettings(), $issuerLogin);
+                        elseif (count($players) <= 1) {
+                            $onError('Knockout requires multiple players');
+                        }
+                        else
+                        {
+                            $this->start($players, isset($args[1]) && $args[1] === 'now');
+                            Chat::info2('Knockout starting with the following settings:', $issuerLogin);
+                            Chat::info2($this->printSettings(), $issuerLogin);
+                        }
                     }
                     else
                     {
