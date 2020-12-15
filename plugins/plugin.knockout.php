@@ -1,6 +1,6 @@
 <?php
 /*
- * Knockout plugin for Tm-Gery by Voyager006.
+ * Knockout plugin for TMGery by Voyager006.
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
@@ -2914,7 +2914,6 @@ class KnockoutRuntime
             case GameMode::Laps:
             case GameMode::Stunts:
             case GameMode::TimeAttack:
-                // Todo: ensure game mode settings are not changed
                 QueryManager::query('RestartChallenge');
                 break;
 
@@ -2928,8 +2927,8 @@ class KnockoutRuntime
                 $scores = $this->scores->getSortedScores();
                 if (isset($scores[0]) && $scores[0]['Score'] > 0)
                 {
-                    // If someone have finished, the only way to restart the
-                    // round is to start from round 1
+                    // If someone have finished, the only way to restart the round is to start from
+                    // round 1
                     QueryManager::query('RestartChallenge');
                 }
                 else
@@ -4819,7 +4818,7 @@ class KnockoutRuntime
                         forcePlay($issuerLogin, true);
                     }
                     $this->onKoStatusUpdate();
-                    Chat::info(sprintf('$x%s$z has opted in to the knockout', $playerObj['NickName']));
+                    Chat::info(sprintf('$x%s$z has opted back in to the knockout', $playerObj['NickName']));
                 }
                 else
                 {
@@ -4908,7 +4907,7 @@ class KnockoutRuntime
                 Chat::info(sprintf('$x%s$z has opted out of the knockout', $playerObj['NickName']));
                 break;
 
-            // /ko help
+            // /ko help (page 1)
             case 461:
                 $this->cliReference(1, $login);
                 break;
