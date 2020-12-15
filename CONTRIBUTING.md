@@ -1,4 +1,14 @@
-# Some notes about commands and callbacks
+# Contributing
+
+## Resources
+
+You may find some of these resources useful when working on this project:
+
+- XML-RPC methods: https://methods.xaseco.org/methodstmf.php
+- Callback methods and structs: https://server.xaseco.org/callbacks.php
+- Manialinks, backgrounds and formatting tags: the (Trackmania ManiaLink styles)[tmtp:///:example] manialink
+
+## Some notes about commands and callbacks
 
 onStatusChange and respective callbacks are called in varying order:
 
@@ -22,7 +32,7 @@ Results in error code -1000 (Change in progress), if proceeding to next round, i
 - SendDisplayManialinkPage
 - SendDisplayManialinkPageToLogin
 
-May not have an effect with custom_ui when called in onBeginSynchronization (but could be due to Tm-Gery)
+May not have an effect with custom_ui when called in onBeginSynchronization (but could be due to TMGery)
 
 ---
 
