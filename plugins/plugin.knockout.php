@@ -3113,9 +3113,9 @@ class KnockoutRuntime
     }
 
     /**
-     * Returns true if an unregistered player is eligible to join the KO.
+     * Returns true if an unregistered player is eligible to join the knockout.
      *
-     * Cases where a player can join a KO while it's running include:
+     * Cases where a player can join a knockout while it's running include:
      * - The knockout is about to start, but has not started yet
      * - The knockout is in its first warmup
      * - The knockout is in its first round (for Time Attack and Stunts)
@@ -3124,6 +3124,10 @@ class KnockoutRuntime
      */
     private function isEligibleToJoin() {
         if ($this->koStatus === KnockoutStatus::Starting || $this->koStatus === KnockoutStatus::StartingNow)
+        {
+            return true;
+        }
+        elseif ($this->isPodium && $this->roundNumber <= 0)
         {
             return true;
         }
@@ -3160,6 +3164,7 @@ class KnockoutRuntime
         $joinsAsSpectator = $args[1];
         $playerInfo = QueryManager::queryWithResponse('GetPlayerInfo', $login);
         $didJoin = false;
+        $didRejoin = false;
         // Only disconnected players who are eligible to rejoin should be matched here; see
         // onPlayerDisconnect
         if ($this->playerList->exists($login))
@@ -3178,7 +3183,7 @@ class KnockoutRuntime
                 case PlayerStatus::PlayingAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Playing);
                     forcePlay($login, true);
-                    $didJoin = true;
+                    $didRejoin = true;
                     break;
 
                 case PlayerStatus::Shelved:
@@ -3187,7 +3192,7 @@ class KnockoutRuntime
                 case PlayerStatus::ShelvedAndDisconnected:
                     $this->playerList->setStatus($login, PlayerStatus::Shelved);
                     forceSpec($login, true);
-                    $didJoin = true;
+                    $didRejoin = true;
                     break;
 
                 case PlayerStatus::OptingOut:
@@ -3224,11 +3229,16 @@ class KnockoutRuntime
                 forceSpec($login, true);
             }
         }
+
         if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
         {
             $this->updateStatusBar($login);
             $this->announceRoundInChat($login);
             if ($didJoin)
+            {
+                Chat::info('The knockout is about to start! Gogogo', $login);
+            }
+            elseif ($didRejoin)
             {
                 Chat::info('You rejoined in time! Gogogo', $login);
             }
@@ -4758,76 +4768,6 @@ class KnockoutRuntime
     }
 
     /**
-     * @param array $args Arguments to the command.
-     * @param array $issuer A single-element array.
-     *
-     *     $issuer = [
-     *         [0] => (string) The login of the player who issued the command.
-     *         [1] => (string) The nickname of the player who issued the command.
-     *     ]
-     */
-    public function test1ChatCommand($args, $issuer)
-    {
-        if (isadmin($issuer[0]))
-        {
-            $this->playerList->add('somerandomdude', 'somerandomdude', PlayerStatus::Playing, $this->lives);
-            $this->updateKoCount();
-            Chat::info2('test1 done', array($issuer[0]));
-        }
-        else
-        {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
-        }
-    }
-
-    /**
-     * @param array $args Arguments to the command.
-     * @param array $issuer A single-element array.
-     *
-     *     $issuer = [
-     *         [0] => (string) The login of the player who issued the command.
-     *         [1] => (string) The nickname of the player who issued the command.
-     *     ]
-     */
-    public function test2ChatCommand($args, $issuer)
-    {
-        if (isadmin($issuer[0]))
-        {
-            $voyScore = $this->scores->get('voyager006');
-            $this->scores->submitScore('somerandomdude', 'somerandomdude', $voyScore);
-            $this->updateScoreboard();
-            Chat::info2('test2 done', array($issuer[0]));
-        }
-        else
-        {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
-        }
-    }
-
-    /**
-     * @param array $args Arguments to the command.
-     * @param array $issuer A single-element array.
-     *
-     *     $issuer = [
-     *         [0] => (string) The login of the player who issued the command.
-     *         [1] => (string) The nickname of the player who issued the command.
-     *     ]
-     */
-    public function test3ChatCommand($args, $issuer)
-    {
-        if (isadmin($issuer[0]))
-        {
-            $this->scores->submitScore('somerandomdude', 'somerandomdude', 0);
-            $this->updateScoreboard();
-            Chat::info2('test3 done', array($issuer[0]));
-        }
-        else
-        {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
-        }
-    }
-
-    /**
      * Called when a player clicks on a button.
      *
      * @param array $args Arguments to the command.
@@ -4846,9 +4786,9 @@ class KnockoutRuntime
         $login = $args[1];
         switch ($args[2])
         {
-            // Tm-Gery GUI button
+            // TMGery GUI button
             case 98:
-                // TmGery has already changed the state of PlayerScript by now
+                // TMGery has already changed the state of PlayerScript by now
                 if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
                 {
                     if ($PlayerScript[$login] === '1')
@@ -4862,7 +4802,7 @@ class KnockoutRuntime
                 }
                 break;
 
-            // /opt out
+            // /opt out -> Yes
             case 451:
                 $playerObj = $this->playerList->get($login);
                 if (($this->koStatus === KnockoutStatus::Running && !$this->isPodium)
@@ -4879,14 +4819,17 @@ class KnockoutRuntime
                 Chat::info(sprintf('$x%s$z has opted out of the knockout', $playerObj['NickName']));
                 break;
 
+            // /ko help
             case 461:
                 $this->cliReference(1, $login);
                 break;
 
+            // /ko help (page 2)
             case 462:
                 $this->cliReference(2, $login);
                 break;
 
+            // /ko help (page 3)
             case 463:
                 $this->cliReference(3, $login);
                 break;
@@ -4912,8 +4855,5 @@ $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
 $this->addChatCommand('ko', true, 'adminChatCommands');
 $this->addChatCommand('info', true, 'infoChatCommand');
 $this->addChatCommand('opt', true, 'optChatCommand');
-$this->addChatCommand('test1', false, 'test1ChatCommand');
-$this->addChatCommand('test2', false, 'test2ChatCommand');
-$this->addChatCommand('test3', false, 'test3ChatCommand');
 
 ?>
