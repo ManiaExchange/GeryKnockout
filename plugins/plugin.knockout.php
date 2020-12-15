@@ -3236,7 +3236,14 @@ class KnockoutRuntime
             $this->announceRoundInChat($login);
             if ($didJoin)
             {
-                Chat::info('The knockout is about to start! Gogogo', $login);
+                if (!$this->isWarmup && !$this->isPodium && $this->roundNumber === 1)
+                {
+                    Chat::info('The knockout has started! Gogogo', $login);
+                }
+                else
+                {
+                    Chat::info('The knockout is about to start! Gogogo', $login);
+                }
             }
             elseif ($didRejoin)
             {
