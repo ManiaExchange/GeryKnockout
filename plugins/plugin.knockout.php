@@ -3700,6 +3700,772 @@ class KnockoutRuntime
         }
     }
 
+    // /ko start [now]
+    private function cliStart($args, $onError, $issuerLogin)
+    {
+        if ($this->koStatus !== KnockoutStatus::Idle)
+        {
+            $onError('There is already a knockout in progress');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko start$x or $x/ko start now$x)');
+        }
+        elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
+        {
+            $mode = QueryManager::queryWithResponse('GetGameMode');
+            $players = QueryManager::queryWithResponse('GetPlayerList', 255, 0, 1);
+            if ($mode === GameMode::Team)
+            {
+                $onError('Knockout does not work in Team mode');
+            }
+            elseif ($mode === GameMode::Cup)
+            {
+                $onError('Knockout does not work in Cup mode');
+            }
+            elseif (count($players) <= 1) {
+                // only 1 player? WTF!?! MrA demands moarrr
+                $onError('Knockout requires at least 2 players');
+            }
+            else
+            {
+                $this->start($players, isset($args[1]) && $args[1] === 'now');
+                Chat::info2('Knockout starting with the following settings:', $issuerLogin);
+                Chat::info2($this->printSettings(), $issuerLogin);
+            }
+        }
+        else
+        {
+            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko start$x or $x/ko start now$x)', $args[1]));
+        }
+    }
+
+    // /ko stop
+    private function cliStop($args, $onError)
+    {
+        if (isset($args[1]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko stop$x)');
+        }
+        elseif ($this->koStatus === KnockoutStatus::Idle)
+        {
+            $onError('The knockout must be running before this command can be used');
+        }
+        else
+        {
+            $this->stop();
+            UI::restoreDefaultScoreboard();
+            $this->koStatus = KnockoutStatus::Idle;
+            Chat::info('Knockout has been stopped');
+        }
+    }
+
+    // /ko skip [warmup]
+    private function cliSkip($args, $onError)
+    {
+        if ($this->koStatus === KnockoutStatus::Idle)
+        {
+            $onError('The knockout must be running before this command can be used');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko skip$x or $x/ko skip warmup$x)');
+        }
+        elseif (!isset($args[1]))
+        {
+            if ($this->koStatus === KnockoutStatus::Tiebreaker)
+            {
+                $this->returnFromTiebreaker();
+            }
+            if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+            {
+                $this->koStatus = KnockoutStatus::SkippingTrack;
+                $this->updateStatusBar();
+            }
+            QueryManager::query('NextChallenge');
+            Chat::info('Skipping the current track');
+        }
+        elseif (strtolower($args[1]) === 'warmup')
+        {
+            if ($this->isWarmup)
+            {
+                if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+                {
+                    $this->koStatus = KnockoutStatus::SkippingWarmup;
+                    $this->updateStatusBar();
+                }
+                $this->skipWarmup();
+                Chat::info('Skipping the warmup');
+            }
+            else
+            {
+                $onError('There is currently no warmup to skip');
+            }
+        }
+        else
+        {
+            $onError(sprintf('Unexpected argument $x%s$x (expected $x/ko skip$x or $x/ko skip warmup$x)', $args[1]));
+        }
+    }
+
+    // /ko restart [warmup]
+    private function cliRestart($args, $onError)
+    {
+        if ($this->koStatus === KnockoutStatus::Idle)
+        {
+            $onError('The knockout must be running before this command can be used');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko restart$x or $x/ko restart warmup$x)');
+        }
+        elseif (!isset($args[1]))
+        {
+            if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+            {
+                if ($this->koStatus === KnockoutStatus::Tiebreaker)
+                {
+                    $this->scores->reset();
+                }
+                else
+                {
+                    $this->koStatus = KnockoutStatus::RestartingRound;
+                    $this->updateStatusBar();
+                }
+            }
+            $this->restartRound();
+            Chat::info('Restarting the current round');
+        }
+        elseif (strtolower($args[1]) === 'warmup')
+        {
+            if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+            {
+                if ($this->koStatus === KnockoutStatus::Tiebreaker)
+                {
+                    $this->returnFromTiebreaker();
+                }
+                $this->koStatus = KnockoutStatus::RestartingTrack;
+                $this->updateStatusBar();
+            }
+            $this->restartTrack();
+            Chat::info('Restarting the track');
+        }
+        else
+        {
+            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko restart$x or $x/ko restart warmup$x)', $args[1]));
+        }
+    }
+
+    // /ko add (<login> | *)
+    private function cliAdd($args, $onError)
+    {
+        if ($this->koStatus === KnockoutStatus::Idle)
+        {
+            $onError('The knockout must be running before this command can be used');
+        }
+        elseif (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $x/ko add (<login> | *)$x)');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko add (<login> | *)$x)');
+        }
+        else
+        {
+            $playersToAdd = array();
+            if ($args[1] === '*')
+            {
+                $playersToAdd = $this->playerList->getAll();
+            }
+            elseif ($this->playerList->exists($args[1]))
+            {
+                $playersToAdd = array($this->playerList->get($args[1]));
+            }
+            else
+            {
+                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                return;
+            }
+
+            $playersToAdd = array_filter(
+                $playersToAdd,
+                function($player) { return !PlayerStatus::isIn($player['Status']); }
+            );
+            if (count($playersToAdd) === 0)
+            {
+                if ($args[1] === '*')
+                {
+                    $onError('All players are already playing');
+                }
+                else
+                {
+                    $onError(sprintf('$x%s$x is already playing', $args[1]));
+                }
+            }
+            else
+            {
+                $this->add($playersToAdd);
+                if ($args[1] === '*')
+                {
+                    Chat::info('All players have been added to the KO');
+                }
+                else
+                {
+                    Chat::info(sprintf('$x%s$z has been added to the KO', $playersToAdd[0]['NickName']));
+                }
+            }
+        }
+    }
+
+    // /ko remove (<login> | *)
+    // /ko spec (<login> | *)
+    private function cliRemove($args, $onError)
+    {
+        if ($this->koStatus === KnockoutStatus::Idle)
+        {
+            $onError('The knockout must be running before this command can be used');
+        }
+        elseif (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $x/ko remove (<login> | *)$x)');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko remove (<login> | *)$x)');
+        }
+        else
+        {
+            $playersToRemove = array();
+            if ($args[1] === '*')
+            {
+                $playersToRemove = $this->playerList->getAll();
+            }
+            elseif ($this->playerList->exists($args[1]))
+            {
+                $playersToRemove = array($this->playerList->get($args[1]));
+            }
+            else
+            {
+                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                return;
+            }
+
+            if ($args[0] === 'remove')
+            {
+                $playersToRemove = array_filter(
+                    $playersToRemove,
+                    function($player) { return $player['Status'] !== PlayerStatus::KnockedOut; }
+                );
+                if (count($playersToRemove) === 0)
+                {
+                    if ($args[1] === '*')
+                    {
+                        $onError('All players are already knocked out');
+                    }
+                    else
+                    {
+                        $onError(sprintf('$x%s$x is already knocked out', $args[1]));
+                    }
+                }
+                else
+                {
+                    $this->remove($playersToRemove, PlayerStatus::KnockedOut);
+                    if ($args[1] === '*')
+                    {
+                        Chat::info('All players have been removed from the KO');
+                    }
+                    else
+                    {
+                        if ($playersToRemove[0]['Status'] === PlayerStatus::KnockedOutAndSpectating)
+                        {
+                            Chat::info(sprintf('$x%s$z has been moved from spectating status to knocked out status', $playersToRemove[0]['NickName']));
+                        }
+                        else
+                        {
+                            Chat::info(sprintf('$x%s$z has been removed from the knockout', $playersToRemove[0]['NickName']));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                $playersToRemove = array_filter(
+                    $playersToRemove,
+                    function($player) { return $player['Status'] !== PlayerStatus::KnockedOutAndSpectating; }
+                );
+                if (count($playersToRemove) === 0)
+                {
+                    if ($args[1] === '*')
+                    {
+                        $onError('All players are already spectating');
+                    }
+                    else
+                    {
+                        $onError(sprintf('$x%s$x is already spectating', $args[1]));
+                    }
+                }
+                else
+                {
+                    $this->remove($playersToRemove, PlayerStatus::KnockedOutAndSpectating);
+                    if ($args[1] === '*')
+                    {
+                        Chat::info('All players have been put to spec');
+                    }
+                    else
+                    {
+                        Chat::info(sprintf('$x%s$z has been put to spec', $playersToRemove[0]['NickName']));
+                    }
+                }
+            }
+        }
+    }
+
+    // /ko lives (<login> | *) [[+ | -]<lives>]
+    private function cliLives($args, $onError, $issuerLogin)
+    {
+        if (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $x/ko lives (<login> | *) [[+ | -]<lives>]$x)');
+        }
+        elseif (isset($args[3]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko lives (<login> | *) [[+ | -]<lives>]$x)');
+        }
+        else
+        {
+            $playersToUpdate = array();
+            if ($args[1] === '*')
+            {
+                $playersToUpdate = $this->playerList->getPlayingOrShelved();
+            }
+            elseif ($this->koStatus === KnockoutStatus::Idle)
+            {
+                $onError('The knockout must be running before this command can be used');
+                return;
+            }
+            elseif ($this->playerList->exists($args[1]))
+            {
+                $playersToUpdate = array($this->playerList->get($args[1]));
+            }
+            else
+            {
+                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                return;
+            }
+
+            if (!isset($args[2]))
+            {
+                // Display
+                if ($this->koStatus === KnockoutStatus::Idle)
+                {
+                    $onError('The knockout must be running before this command can be used');
+                }
+                else
+                {
+                    $msg = implode(', ', array_map(
+                        function ($player) { return sprintf('$x%s$z (%s)', $player['NickName'], $player['Lives']); },
+                        $playersToUpdate
+                    ));
+                    Chat::info2($msg, $issuerLogin);
+                }
+            }
+            elseif (!is_numeric($args[2]))
+            {
+                $onError(sprintf('Error: argument $x%s$x is not a number', $args[2]));
+            }
+            elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
+            {
+                $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+            }
+            else
+            {
+                $sign = substr($args[2], 0, 1);
+                $value = abs((int) $args[2]);
+                $livesStr = pluralize($value, 'life', 'lives');
+                if ($value === 0)
+                {
+                    $onError(sprintf('Error: argument $x%d$x must be a non-zero value', $value));
+                }
+                elseif ($sign === '+' || $sign === '-')
+                {
+                    // Relative
+                    $this->adjustLivesRelatively($playersToUpdate, $value, $args[1] === '*');
+                    $actionStr = $sign === '+' ? 'given' : 'deducted';
+                    if ($args[1] === '*')
+                    {
+                        if (KnockoutStatus::isInProgress($this->koStatus))
+                        {
+                            Chat::info(sprintf('All players have been %s %s', $actionStr, $livesStr));
+                        }
+                        else
+                        {
+                            $actionStr = $sign === '+' ? 'increased' : 'decreased';
+                            Chat::info(sprintf('Lives per player has been %s by %d (is now %d)', $actionStr, $value, $this->lives));
+                        }
+                    }
+                    else
+                    {
+                        $target = $this->playerList->get($args[1]);
+                        Chat::info(sprintf('$x%s$z has been %s %s (currently at %d)', $target['NickName'], $actionStr, $livesStr, $target['Lives']));
+                    }
+                }
+                else
+                {
+                    // Absolute
+                    $this->adjustLives($playersToUpdate, $value, $args[1] === '*');
+                    if ($args[1] === '*')
+                    {
+                        if (KnockoutStatus::isInProgress($this->koStatus))
+                        {
+                            Chat::info(sprintf('All players have now %s', $livesStr));
+                        }
+                        else
+                        {
+                            Chat::info(sprintf('Lives per player has been set to %d', $value));
+                        }
+                    }
+                    else
+                    {
+                        Chat::info(sprintf('$x%s$z has now %s', $playersToUpdate[0]['NickName'], $livesStr));
+                    }
+                }
+            }
+        }
+    }
+
+    // /ko multi (constant <kos> | extra <per_x_players> | dynamic <total_rounds> | none)
+    private function cliMulti($args, $onError)
+    {
+        if ($this->koStatus === KnockoutStatus::Tiebreaker)
+        {
+            $onError('Error: not allowed to change multi KO value during tiebreaker');
+        }
+        else
+        {
+            switch ($args[1])
+            {
+                case 'none':
+                    if (isset($args[2]))
+                    {
+                        $onError('Syntax error: too many arguments (usage: $x/ko multi none$x)');
+                    }
+                    else
+                    {
+                        $this->koMultiplier->set(KOMultiplier::None, null);
+                        Chat::info(sprintf('KO multiplier set to $x%s$x', $this->koMultiplier->toString()));
+                        $this->onKoStatusUpdate();
+                    }
+                    break;
+
+                case 'constant':
+                    if (!isset($args[2]))
+                    {
+                        $onError('Syntax error: expected an argument (usage: $x/ko multi constant <x KOs per round>$x)');
+                    }
+                    elseif (isset($args[3]))
+                    {
+                        $onError('Syntax error: too many arguments (usage: $x/ko multi constant <x KOs per round>$x)');
+                    }
+                    elseif (!is_numeric($args[2]))
+                    {
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi constant <x KOs per round>$x)', $args[1]));
+                    }
+                    elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
+                    {
+                        $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+                    }
+                    else
+                    {
+                        $val = (int) $args[2];
+                        if ($val <= 0)
+                        {
+                            $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi constant <x KOs per round>$x)', $val));
+                        }
+                        else
+                        {
+                            $this->koMultiplier->set(KOMultiplier::Constant, $val);
+                            Chat::info(sprintf('KO multiplier set to $x%s', $this->koMultiplier->toString()));
+                            $this->onKoStatusUpdate();
+                        }
+                    }
+                    break;
+
+                case 'extra':
+                    if (!isset($args[2]))
+                    {
+                        $onError('Syntax error: expected an argument (usage: $x/ko multi extra <per X players>$x)');
+                    }
+                    elseif (isset($args[3]))
+                    {
+                        $onError('Syntax error: too many arguments (usage: $x/ko multi extra <per X players>$x)');
+                    }
+                    elseif (!is_numeric($args[2]))
+                    {
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi extra <per x players>$x)', $args[1]));
+                    }
+                    elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
+                    {
+                        $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+                    }
+                    else
+                    {
+                        $val = (int) $args[2];
+                        if ($val <= 0)
+                        {
+                            $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi extra <per x players>$x)', $val));
+                        }
+                        else
+                        {
+                            $this->koMultiplier->set(KOMultiplier::Extra, $val);
+                            Chat::info(sprintf('KO multiplier set to $x%s$x', $this->koMultiplier->toString()));
+                            $this->onKoStatusUpdate();
+                        }
+                    }
+                    break;
+
+                case 'dynamic':
+                    if (!isset($args[2]))
+                    {
+                        $onError('Syntax error: expected an argument (usage: $x/ko multi dynamic <X rounds>$x)');
+                    }
+                    elseif (isset($args[3]))
+                    {
+                        $onError('Syntax error: too many arguments (usage: $x/ko multi dynamic <X rounds>$x)');
+                    }
+                    elseif (!is_numeric($args[2]))
+                    {
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi dynamic <x rounds>$x)', $args[1]));
+                    }
+                    elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
+                    {
+                        $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+                    }
+                    else
+                    {
+                        $val = (int) $args[2];
+                        if ($val <= 0)
+                        {
+                            $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi dynamic <x rounds>$x)', $val));
+                        }
+                        else
+                        {
+                            $this->koMultiplier->set(KOMultiplier::Dynamic, $val);
+                            Chat::info(sprintf('KO multiplier set to $x%s', $this->koMultiplier->toString()));
+                            $this->onKoStatusUpdate();
+                        }
+                    }
+                    break;
+
+                default:
+                    if (isset($args[1]))
+                    {
+                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $xconstant$x, $xextra$x or $xnone$x)', $args[1]));
+                    }
+                    else
+                    {
+                        $onError('Syntax error: expected an argument (usage: $x/ko multi (constant <x KOs per round> | extra <per x players> | dynamic <x rounds> | none)$x)');
+                    }
+                    break;
+            }
+        }
+    }
+
+    // /ko openwarmup (on | off)
+    private function cliOpenwarmup($args, $onError)
+    {
+        if (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $x/ko openwarmup (on | off)$x)');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko openwarmup (on | off)$x)');
+        }
+        elseif ($args[1] === 'on')
+        {
+            $this->openWarmup = true;
+            if ($this->isWarmup) $this->letKnockedOutPlayersPlay();
+            Chat::info('Open warmup has been enabled');
+        }
+        elseif ($args[1] === 'off')
+        {
+            $this->openWarmup = false;
+            if ($this->isWarmup) $this->putKnockedOutPlayersIntoSpec();
+            Chat::info('Open warmup has been disabled');
+        }
+        else
+        {
+            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
+        }
+    }
+
+    // /ko falsestart <max_tries>
+    private function cliFalsestart($args, $onError)
+    {
+        if (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $x/ko falsestart <max tries>$x)');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko falsestart <max tries>$x)');
+        }
+        elseif (!is_numeric($args[1]))
+        {
+            $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
+        }
+        elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
+        {
+            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+        }
+        else
+        {
+            $val = (int) $args[1];
+            if ($val < 0)
+            {
+                $onError(sprintf('Error: argument $x%d$x must be 0 or greater', $val));
+            }
+            else
+            {
+                $prev = $this->maxFalseStarts;
+                $this->maxFalseStarts = $val;
+                $msg = $val === 0
+                    ? sprintf('False start detection have been disabled (previously set to $x%d$x)', $prev)
+                    : sprintf('False start limit has been set to $x%d$x (previously $x%d$x)', $val, $prev);
+                Chat::info($msg);
+            }
+        }
+    }
+
+    // /ko tiebreaker (on | off)
+    private function cliTiebreaker($args, $onError)
+    {
+        if (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $x/ko tiebreaker (on | off)>$x)');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko tiebreaker (on | off)$x)');
+        }
+        elseif ($args[1] === 'on')
+        {
+            $this->tiebreaker = true;
+            Chat::info('Tiebreakers have been enabled');
+        }
+        elseif ($args[1] === 'off')
+        {
+            $this->tiebreaker = false;
+            Chat::info('Tiebreakers have been disabled');
+        }
+        else
+        {
+            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
+        }
+    }
+
+    // /ko authorskip <for_top_x_players>
+    private function cliAuthorskip($args, $onError)
+    {
+        if (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $x/ko authorskip <for top X players>$x)');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko authorskip <for top X players>$x)');
+        }
+        elseif (!is_numeric($args[1]))
+        {
+            $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
+        }
+        elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
+        {
+            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+        }
+        else
+        {
+            $val = (int) $args[1];
+            if ($val < 0)
+            {
+                $onError(sprintf('Error: argument $x%d$x must be 0 or greater', $val));
+            }
+            else
+            {
+                $prev = $this->authorSkip;
+                $this->authorSkip = $val;
+                $msg = $val === 0
+                    ? sprintf('Author skips have been disabled (previously set to $x%d$x)', $prev)
+                    : sprintf('Author skip has been enabled for top $x%d$x (previously $x%d$x)', $val, $prev);
+                Chat::info($msg);
+            }
+        }
+    }
+
+    // /ko settings
+    private function cliSettings($args, $onError, $issuerLogin)
+    {
+        if (isset($args[1]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko settings$x)');
+        }
+        else
+        {
+            Chat::info2($this->printSettings(), $issuerLogin);
+        }
+    }
+
+    // /ko status
+    private function cliStatus($args, $onError, $issuerLogin)
+    {
+        if (isset($args[1]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko status$x)');
+        }
+        else
+        {
+            $playerList = array_map(
+                function($player)
+                {
+                    return sprintf('%s (%s)',
+                        getNameOfConstant($player['Status'], 'PlayerStatus'),
+                        pluralize($player['Lives'], 'life', 'lives')
+                    );
+                },
+                $this->playerList->getAll()
+            );
+            $scores = array_map(
+                function($score) { return sprintf('%s (%s)', $score['Login'], $score['Score']); },
+                $this->scores->getSortedScores()
+            );
+            $text = implode("\n", array(
+                sprintf('KO status: %s', getNameOfConstant($this->koStatus, 'KnockoutStatus')),
+                sprintf('KO mode: %s', getNameOfConstant($this->koMode, 'KnockoutMode')),
+                sprintf('KOs this round: %d', $this->kosThisRound),
+                sprintf('Is warmup: %d', $this->isWarmup),
+                sprintf('Is podium: %d', $this->isPodium),
+                sprintf('Game mode: %s', getNameOfConstant($this->gameMode, 'GameMode')),
+                sprintf('Player list: %s', print_r($playerList, true)),
+                sprintf('Scores: %s', print_r($scores, true))
+            ));
+            UI::showInfoDialog($text, $issuerLogin);
+        }
+    }
+
+    // /ko help
+    private function cliHelp($args, $onError, $issuerLogin)
+    {
+        if (isset($args[1]))
+        {
+            $onError('Syntax error: too many arguments (usage: $x/ko help$x)');
+        }
+        else
+        {
+            $this->cliReference(1, $issuerLogin);
+        }
+    }
+
     /**
      * CLI for interacting with the knockout system.
      *
@@ -3749,749 +4515,65 @@ class KnockoutRuntime
         {
             switch (strtolower($args[0]))
             {
-                // /ko start [now]
                 case 'start':
-                    if ($this->koStatus !== KnockoutStatus::Idle)
-                    {
-                        $onError('There is already a knockout in progress');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko start$x or $x/ko start now$x)');
-                    }
-                    elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
-                    {
-                        $mode = QueryManager::queryWithResponse('GetGameMode');
-                        $players = QueryManager::queryWithResponse('GetPlayerList', 255, 0, 1);
-                        if ($mode === GameMode::Team)
-                        {
-                            $onError('Knockout does not work in Team mode');
-                        }
-                        elseif ($mode === GameMode::Cup)
-                        {
-                            $onError('Knockout does not work in Cup mode');
-                        }
-                        elseif (count($players) <= 1) {
-                            // only 1 player? WTF!?! MrA demands moarrr
-                            $onError('Knockout requires at least 2 players');
-                        }
-                        else
-                        {
-                            $this->start($players, isset($args[1]) && $args[1] === 'now');
-                            Chat::info2('Knockout starting with the following settings:', $issuerLogin);
-                            Chat::info2($this->printSettings(), $issuerLogin);
-                        }
-                    }
-                    else
-                    {
-                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko start$x or $x/ko start now$x)', $args[1]));
-                    }
+                    $this->cliStart($args, $onError, $issuerLogin);
                     break;
 
-                // /ko stop
                 case 'stop':
-                    if (isset($args[1]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko stop$x)');
-                    }
-                    elseif ($this->koStatus === KnockoutStatus::Idle)
-                    {
-                        $onError('The knockout must be running before this command can be used');
-                    }
-                    else
-                    {
-                        $this->stop();
-                        UI::restoreDefaultScoreboard();
-                        $this->koStatus = KnockoutStatus::Idle;
-                        Chat::info('Knockout has been stopped');
-                    }
+                    $this->cliStop($args, $onError);
                     break;
 
-                // /ko skip [warmup]
                 case 'skip':
-                    if ($this->koStatus === KnockoutStatus::Idle)
-                    {
-                        $onError('The knockout must be running before this command can be used');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko skip$x or $x/ko skip warmup$x)');
-                    }
-                    elseif (!isset($args[1]))
-                    {
-                        if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                        {
-                            $this->returnFromTiebreaker();
-                        }
-                        if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
-                        {
-                            $this->koStatus = KnockoutStatus::SkippingTrack;
-                            $this->updateStatusBar();
-                        }
-                        QueryManager::query('NextChallenge');
-                        Chat::info('Skipping the current track');
-                    }
-                    elseif (strtolower($args[1]) === 'warmup')
-                    {
-                        if ($this->isWarmup)
-                        {
-                            if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
-                            {
-                                $this->koStatus = KnockoutStatus::SkippingWarmup;
-                                $this->updateStatusBar();
-                            }
-                            $this->skipWarmup();
-                            Chat::info('Skipping the warmup');
-                        }
-                        else
-                        {
-                            $onError('There is currently no warmup to skip');
-                        }
-                    }
-                    else
-                    {
-                        $onError(sprintf('Unexpected argument $x%s$x (expected $x/ko skip$x or $x/ko skip warmup$x)', $args[1]));
-                    }
+                    $this->cliSkip($args, $onError);
                     break;
 
-                // /ko restart [warmup]
                 case 'restart':
-                    if ($this->koStatus === KnockoutStatus::Idle)
-                    {
-                        $onError('The knockout must be running before this command can be used');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko restart$x or $x/ko restart warmup$x)');
-                    }
-                    elseif (!isset($args[1]))
-                    {
-                        if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
-                        {
-                            if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                            {
-                                $this->scores->reset();
-                            }
-                            else
-                            {
-                                $this->koStatus = KnockoutStatus::RestartingRound;
-                                $this->updateStatusBar();
-                            }
-                        }
-                        $this->restartRound();
-                        Chat::info('Restarting the current round');
-                    }
-                    elseif (strtolower($args[1]) === 'warmup')
-                    {
-                        if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
-                        {
-                            if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                            {
-                                $this->returnFromTiebreaker();
-                            }
-                            $this->koStatus = KnockoutStatus::RestartingTrack;
-                            $this->updateStatusBar();
-                        }
-                        $this->restartTrack();
-                        Chat::info('Restarting the track');
-                    }
-                    else
-                    {
-                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko restart$x or $x/ko restart warmup$x)', $args[1]));
-                    }
+                    $this->cliRestart($args, $onError);
                     break;
 
-                // /ko add (<login> | *)
                 case 'add':
-                    if ($this->koStatus === KnockoutStatus::Idle)
-                    {
-                        $onError('The knockout must be running before this command can be used');
-                    }
-                    elseif (!isset($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $x/ko add (<login> | *)$x)');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko add (<login> | *)$x)');
-                    }
-                    else
-                    {
-                        $playersToAdd = array();
-                        if ($args[1] === '*')
-                        {
-                            $playersToAdd = $this->playerList->getAll();
-                        }
-                        elseif ($this->playerList->exists($args[1]))
-                        {
-                            $playersToAdd = array($this->playerList->get($args[1]));
-                        }
-                        else
-                        {
-                            $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
-                            return;
-                        }
-
-                        $playersToAdd = array_filter(
-                            $playersToAdd,
-                            function($player) { return !PlayerStatus::isIn($player['Status']); }
-                        );
-                        if (count($playersToAdd) === 0)
-                        {
-                            if ($args[1] === '*')
-                            {
-                                $onError('All players are already playing');
-                            }
-                            else
-                            {
-                                $onError(sprintf('$x%s$x is already playing', $args[1]));
-                            }
-                        }
-                        else
-                        {
-                            $this->add($playersToAdd);
-                            if ($args[1] === '*')
-                            {
-                                Chat::info('All players have been added to the KO');
-                            }
-                            else
-                            {
-                                Chat::info(sprintf('$x%s$z has been added to the KO', $playersToAdd[0]['NickName']));
-                            }
-                        }
-                    }
+                    $this->cliAdd($args, $onError);
                     break;
 
-                // /ko remove (<login> | *)
-                // /ko spec (<login> | *)
                 case 'remove':
                 case 'spec':
-                    if ($this->koStatus === KnockoutStatus::Idle)
-                    {
-                        $onError('The knockout must be running before this command can be used');
-                    }
-                    elseif (!isset($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $x/ko remove (<login> | *)$x)');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko remove (<login> | *)$x)');
-                    }
-                    else
-                    {
-                        $playersToRemove = array();
-                        if ($args[1] === '*')
-                        {
-                            $playersToRemove = $this->playerList->getAll();
-                        }
-                        elseif ($this->playerList->exists($args[1]))
-                        {
-                            $playersToRemove = array($this->playerList->get($args[1]));
-                        }
-                        else
-                        {
-                            $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
-                            return;
-                        }
-
-                        if ($args[0] === 'remove')
-                        {
-                            $playersToRemove = array_filter(
-                                $playersToRemove,
-                                function($player) { return $player['Status'] !== PlayerStatus::KnockedOut; }
-                            );
-                            if (count($playersToRemove) === 0)
-                            {
-                                if ($args[1] === '*')
-                                {
-                                    $onError('All players are already knocked out');
-                                }
-                                else
-                                {
-                                    $onError(sprintf('$x%s$x is already knocked out', $args[1]));
-                                }
-                            }
-                            else
-                            {
-                                $this->remove($playersToRemove, PlayerStatus::KnockedOut);
-                                if ($args[1] === '*')
-                                {
-                                    Chat::info('All players have been removed from the KO');
-                                }
-                                else
-                                {
-                                    Chat::info(sprintf('$x%s$z has been removed from the KO', $playersToRemove[0]['NickName']));
-                                }
-                            }
-                        }
-                        else
-                        {
-                            $playersToRemove = array_filter(
-                                $playersToRemove,
-                                function($player) { return $player['Status'] !== PlayerStatus::KnockedOutAndSpectating; }
-                            );
-                            if (count($playersToRemove) === 0)
-                            {
-                                if ($args[1] === '*')
-                                {
-                                    $onError('All players are already spectating');
-                                }
-                                else
-                                {
-                                    $onError(sprintf('$x%s$x is already spectating', $args[1]));
-                                }
-                            }
-                            else
-                            {
-                                $this->remove($playersToRemove, PlayerStatus::KnockedOutAndSpectating);
-                                if ($args[1] === '*')
-                                {
-                                    Chat::info('All players have been put to spec');
-                                }
-                                else
-                                {
-                                    Chat::info(sprintf('$x%s$z has been put to spec', $playersToRemove[0]['NickName']));
-                                }
-                            }
-                        }
-                    }
+                    $this->cliRemove($args, $onError);
                     break;
 
-                // /ko lives (<login> | *) [[+ | -]<lives>]
                 case 'lives':
-                    if (!isset($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $x/ko lives (<login> | *) [[+ | -]<lives>]$x)');
-                    }
-                    elseif (isset($args[3]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko lives (<login> | *) [[+ | -]<lives>]$x)');
-                    }
-                    else
-                    {
-                        $playersToUpdate = array();
-                        if ($args[1] === '*')
-                        {
-                            $playersToUpdate = $this->playerList->getPlayingOrShelved();
-                        }
-                        elseif ($this->koStatus === KnockoutStatus::Idle)
-                        {
-                            $onError('The knockout must be running before this command can be used');
-                            return;
-                        }
-                        elseif ($this->playerList->exists($args[1]))
-                        {
-                            $playersToUpdate = array($this->playerList->get($args[1]));
-                        }
-                        else
-                        {
-                            $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
-                            return;
-                        }
-
-                        if (!isset($args[2]))
-                        {
-                            // Display
-                            if ($this->koStatus === KnockoutStatus::Idle)
-                            {
-                                $onError('The knockout must be running before this command can be used');
-                            }
-                            else
-                            {
-                                $msg = implode(', ', array_map(
-                                    function ($player) { return sprintf('$x%s$z (%s)', $player['NickName'], $player['Lives']); },
-                                    $playersToUpdate
-                                ));
-                                Chat::info2($msg, $issuerLogin);
-                            }
-                        }
-                        elseif (!is_numeric($args[2]))
-                        {
-                            $onError(sprintf('Error: argument $x%s$x is not a number', $args[2]));
-                        }
-                        elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
-                        {
-                            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
-                        }
-                        else
-                        {
-                            $sign = substr($args[2], 0, 1);
-                            $value = abs((int) $args[2]);
-                            $livesStr = pluralize($value, 'life', 'lives');
-                            if ($value === 0)
-                            {
-                                $onError(sprintf('Error: argument $x%d$x must be a non-zero value', $value));
-                            }
-                            elseif ($sign === '+' || $sign === '-')
-                            {
-                                // Relative
-                                $this->adjustLivesRelatively($playersToUpdate, $value, $args[1] === '*');
-                                $actionStr = $sign === '+' ? 'given' : 'deducted';
-                                if ($args[1] === '*')
-                                {
-                                    if (KnockoutStatus::isInProgress($this->koStatus))
-                                    {
-                                        Chat::info(sprintf('All players have been %s %s', $actionStr, $livesStr));
-                                    }
-                                    else
-                                    {
-                                        $actionStr = $sign === '+' ? 'increased' : 'decreased';
-                                        Chat::info(sprintf('Lives per player has been %s by %d (is now %d)', $actionStr, $value, $this->lives));
-                                    }
-                                }
-                                else
-                                {
-                                    $target = $this->playerList->get($args[1]);
-                                    Chat::info(sprintf('$x%s$z has been %s %s (currently at %d)', $target['NickName'], $actionStr, $livesStr, $target['Lives']));
-                                }
-                            }
-                            else
-                            {
-                                // Absolute
-                                $this->adjustLives($playersToUpdate, $value, $args[1] === '*');
-                                if ($args[1] === '*')
-                                {
-                                    if (KnockoutStatus::isInProgress($this->koStatus))
-                                    {
-                                        Chat::info(sprintf('All players have now %s', $livesStr));
-                                    }
-                                    else
-                                    {
-                                        Chat::info(sprintf('Lives per player has been set to %d', $value));
-                                    }
-                                }
-                                else
-                                {
-                                    Chat::info(sprintf('$x%s$z has now %s', $playersToUpdate[0]['NickName'], $livesStr));
-                                }
-                            }
-                        }
-                    }
+                    $this->cliLives($args, $onError, $issuerLogin);
                     break;
 
-                // /ko multi (constant <kos> | extra <per_x_players> | dynamic <total_rounds> | none)
                 case 'multi':
-                    if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                    {
-                        $onError('Error: not allowed to change multi KO value during tiebreaker');
-                    }
-                    else
-                    {
-                        switch ($args[1])
-                        {
-                            case 'none':
-                                if (isset($args[2]))
-                                {
-                                    $onError('Syntax error: too many arguments (usage: $x/ko multi none$x)');
-                                }
-                                else
-                                {
-                                    $this->koMultiplier->set(KOMultiplier::None, null);
-                                    Chat::info(sprintf('KO multiplier set to $x%s$x', $this->koMultiplier->toString()));
-                                    $this->onKoStatusUpdate();
-                                }
-                                break;
-
-                            case 'constant':
-                                if (!isset($args[2]))
-                                {
-                                    $onError('Syntax error: expected an argument (usage: $x/ko multi constant <x KOs per round>$x)');
-                                }
-                                elseif (isset($args[3]))
-                                {
-                                    $onError('Syntax error: too many arguments (usage: $x/ko multi constant <x KOs per round>$x)');
-                                }
-                                elseif (!is_numeric($args[2]))
-                                {
-                                    $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi constant <x KOs per round>$x)', $args[1]));
-                                }
-                                elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
-                                {
-                                    $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
-                                }
-                                else
-                                {
-                                    $val = (int) $args[2];
-                                    if ($val <= 0)
-                                    {
-                                        $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi constant <x KOs per round>$x)', $val));
-                                    }
-                                    else
-                                    {
-                                        $this->koMultiplier->set(KOMultiplier::Constant, $val);
-                                        Chat::info(sprintf('KO multiplier set to $x%s', $this->koMultiplier->toString()));
-                                        $this->onKoStatusUpdate();
-                                    }
-                                }
-                                break;
-
-                            case 'extra':
-                                if (!isset($args[2]))
-                                {
-                                    $onError('Syntax error: expected an argument (usage: $x/ko multi extra <per X players>$x)');
-                                }
-                                elseif (isset($args[3]))
-                                {
-                                    $onError('Syntax error: too many arguments (usage: $x/ko multi extra <per X players>$x)');
-                                }
-                                elseif (!is_numeric($args[2]))
-                                {
-                                    $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi extra <per x players>$x)', $args[1]));
-                                }
-                                elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
-                                {
-                                    $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
-                                }
-                                else
-                                {
-                                    $val = (int) $args[2];
-                                    if ($val <= 0)
-                                    {
-                                        $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi extra <per x players>$x)', $val));
-                                    }
-                                    else
-                                    {
-                                        $this->koMultiplier->set(KOMultiplier::Extra, $val);
-                                        Chat::info(sprintf('KO multiplier set to $x%s$x', $this->koMultiplier->toString()));
-                                        $this->onKoStatusUpdate();
-                                    }
-                                }
-                                break;
-
-                            case 'dynamic':
-                                if (!isset($args[2]))
-                                {
-                                    $onError('Syntax error: expected an argument (usage: $x/ko multi dynamic <X rounds>$x)');
-                                }
-                                elseif (isset($args[3]))
-                                {
-                                    $onError('Syntax error: too many arguments (usage: $x/ko multi dynamic <X rounds>$x)');
-                                }
-                                elseif (!is_numeric($args[2]))
-                                {
-                                    $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi dynamic <x rounds>$x)', $args[1]));
-                                }
-                                elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
-                                {
-                                    $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
-                                }
-                                else
-                                {
-                                    $val = (int) $args[2];
-                                    if ($val <= 0)
-                                    {
-                                        $onError(sprintf('Syntax error: argument $x%d$x must be greater than 0 (usage: $x/ko multi dynamic <x rounds>$x)', $val));
-                                    }
-                                    else
-                                    {
-                                        $this->koMultiplier->set(KOMultiplier::Dynamic, $val);
-                                        Chat::info(sprintf('KO multiplier set to $x%s', $this->koMultiplier->toString()));
-                                        $this->onKoStatusUpdate();
-                                    }
-                                }
-                                break;
-
-                            default:
-                                if (isset($args[1]))
-                                {
-                                    $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $xconstant$x, $xextra$x or $xnone$x)', $args[1]));
-                                }
-                                else
-                                {
-                                    $onError('Syntax error: expected an argument (usage: $x/ko multi (constant <x KOs per round> | extra <per x players> | dynamic <x rounds> | none)$x)');
-                                }
-                                break;
-                        }
-                    }
+                    $this->cliMulti($args, $onError);
                     break;
 
-                // /ko openwarmup (on | off)
                 case 'openwarmup':
-                    if (!isset($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $x/ko openwarmup (on | off)$x)');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko openwarmup (on | off)$x)');
-                    }
-                    elseif ($args[1] === 'on')
-                    {
-                        $this->openWarmup = true;
-                        if ($this->isWarmup) $this->letKnockedOutPlayersPlay();
-                        Chat::info('Open warmup has been enabled');
-                    }
-                    elseif ($args[1] === 'off')
-                    {
-                        $this->openWarmup = false;
-                        if ($this->isWarmup) $this->putKnockedOutPlayersIntoSpec();
-                        Chat::info('Open warmup has been disabled');
-                    }
-                    else
-                    {
-                        $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
-                    }
+                    $this->cliOpenwarmup($args, $onError);
                     break;
 
-                // /ko falsestart <max_tries>
                 case 'falsestart':
-                    if (!isset($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $x/ko falsestart <max tries>$x)');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko falsestart <max tries>$x)');
-                    }
-                    elseif (!is_numeric($args[1]))
-                    {
-                        $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
-                    }
-                    elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
-                    {
-                        $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
-                    }
-                    else
-                    {
-                        $val = (int) $args[1];
-                        if ($val < 0)
-                        {
-                            $onError(sprintf('Error: argument $x%d$x must be 0 or greater', $val));
-                        }
-                        else
-                        {
-                            $prev = $this->maxFalseStarts;
-                            $this->maxFalseStarts = $val;
-                            $msg = $val === 0
-                                ? sprintf('False start detection have been disabled (previously set to $x%d$x)', $prev)
-                                : sprintf('False start limit has been set to $x%d$x (previously $x%d$x)', $val, $prev);
-                            Chat::info($msg);
-                        }
-                    }
+                    $this->cliFalsestart($args, $onError);
                     break;
 
-                // /ko tiebreaker (on | off)
                 case 'tiebreaker':
-                    if (!isset($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $x/ko tiebreaker (on | off)>$x)');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko tiebreaker (on | off)$x)');
-                    }
-                    elseif ($args[1] === 'on')
-                    {
-                        $this->tiebreaker = true;
-                        Chat::info('Tiebreakers have been enabled');
-                    }
-                    elseif ($args[1] === 'off')
-                    {
-                        $this->tiebreaker = false;
-                        Chat::info('Tiebreakers have been disabled');
-                    }
-                    else
-                    {
-                        $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
-                    }
+                    $this->cliTiebreaker($args, $onError);
                     break;
 
-                // /ko authorskip <for_top_x_players>
                 case 'authorskip':
-                    if (!isset($args[1]))
-                    {
-                        $onError('Syntax error: expected an argument (usage: $x/ko authorskip <for top X players>$x)');
-                    }
-                    elseif (isset($args[2]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko authorskip <for top X players>$x)');
-                    }
-                    elseif (!is_numeric($args[1]))
-                    {
-                        $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
-                    }
-                    elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
-                    {
-                        $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
-                    }
-                    else
-                    {
-                        $val = (int) $args[1];
-                        if ($val < 0)
-                        {
-                            $onError(sprintf('Error: argument $x%d$x must be 0 or greater', $val));
-                        }
-                        else
-                        {
-                            $prev = $this->authorSkip;
-                            $this->authorSkip = $val;
-                            $msg = $val === 0
-                                ? sprintf('Author skips have been disabled (previously set to $x%d$x)', $prev)
-                                : sprintf('Author skip has been enabled for top $x%d$x (previously $x%d$x)', $val, $prev);
-                            Chat::info($msg);
-                        }
-                    }
+                    $this->cliAuthorskip($args, $onError);
                     break;
 
-                // /ko settings
                 case 'settings':
-                    if (isset($args[1]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko settings$x)');
-                    }
-                    else
-                    {
-                        Chat::info2($this->printSettings(), $issuerLogin);
-                    }
+                    $this->cliSettings($args, $onError, $issuerLogin);
                     break;
 
-                // /ko status
                 case 'status':
-                    if (isset($args[1]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko status$x)');
-                    }
-                    else
-                    {
-                        $playerList = array_map(
-                            function($player)
-                            {
-                                return sprintf('%s (%s)',
-                                    getNameOfConstant($player['Status'], 'PlayerStatus'),
-                                    pluralize($player['Lives'], 'life', 'lives')
-                                );
-                            },
-                            $this->playerList->getAll()
-                        );
-                        $scores = array_map(
-                            function($score) { return sprintf('%s (%s)', $score['Login'], $score['Score']); },
-                            $this->scores->getSortedScores()
-                        );
-                        $text = implode("\n", array(
-                            sprintf('KO status: %s', getNameOfConstant($this->koStatus, 'KnockoutStatus')),
-                            sprintf('KO mode: %s', getNameOfConstant($this->koMode, 'KnockoutMode')),
-                            sprintf('KOs this round: %d', $this->kosThisRound),
-                            sprintf('Is warmup: %d', $this->isWarmup),
-                            sprintf('Is podium: %d', $this->isPodium),
-                            sprintf('Game mode: %s', getNameOfConstant($this->gameMode, 'GameMode')),
-                            sprintf('Player list: %s', print_r($playerList, true)),
-                            sprintf('Scores: %s', print_r($scores, true))
-                        ));
-                        UI::showInfoDialog($text, $issuerLogin);
-                    }
+                    $this->cliStatus($args, $onError, $issuerLogin);
                     break;
 
-                // ko help
                 case 'help':
-                    if (isset($args[1]))
-                    {
-                        $onError('Syntax error: too many arguments (usage: $x/ko help$x)');
-                    }
-                    else
-                    {
-                        $this->cliReference(1, $issuerLogin);
-                    }
+                    $this->cliHelp($args, $onError, $issuerLogin);
                     break;
 
                 default:
