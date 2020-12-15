@@ -4,7 +4,7 @@ Knockout plugin for the TMGery server controller.
 [CLI reference](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md) | [User guide](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md) | [Report a bug](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=bug&template=bug_report.md&title=) | [Suggest a feature](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=new+feature&template=feature_request.md&title=)
 
 ## About
-This repository contains a plugin for TMGery that enables knockout competitions to be held. Each round, the last players are knocked out until one player remains. This plugin is used in the TMX Knockout United.
+This repository contains a plugin for TMGery that enables knockout competitions to be held. Each round, the last players are knocked out until one player remains. This plugin is used in the TMX Knockout United event, hosted every Friday at 22:00 CE(S)T in TrackMania United Forever.
 
 ## Prerequisites
 - Trackmania dedicated server
@@ -28,7 +28,7 @@ Clone this repository to a folder of your choice. Using Visual Studio Code, [PHP
 ](https://marketplace.visualstudio.com/items?itemName=EditorConfig.EditorConfig) is recommended. Using this setup, copy `tm_gery.php`, `includes\GbxRemote.php`, `includes\plugin_manager.php` and `includes/tm_gery_config.php` from your TMGery installation to a new top level folder `dependencies`. Files in this folder are ignored by `.gitignore`, so you should see them grey out.
 
 ## Contribution
-You may contribute to this project by [reporting bugs](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=bug&template=bug_report.md&title=), [suggesting new features](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=new+feature&template=feature_request.md&title=) or creating pull requests that addresses particular issues. Please consult the [code of conduct](https://github.com/ManiaExchange/GeryKnockout/blob/main/CODE_OF_CONDUCT.md) before doing so.
+You may contribute to this project by [reporting bugs](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=bug&template=bug_report.md&title=), [suggesting new features](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=new+feature&template=feature_request.md&title=) or creating pull requests that addresses particular issues. Please consult the [code of conduct](https://github.com/ManiaExchange/GeryKnockout/blob/main/CODE_OF_CONDUCT.md) and [contribution guidelines](https://github.com/ManiaExchange/GeryKnockout/blob/main/CONTRIBUTING.md) before doing so. If you want to report a security vulnerability, please review our [security policy](https://github.com/ManiaExchange/GeryKnockout/security/policy).
 
 ## Screenshots
 ![In-game screenshot showing the status bar](docs/img/screenshot-status-bar-324p.png)
