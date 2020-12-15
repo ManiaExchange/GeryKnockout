@@ -9,7 +9,7 @@
 
 ## Reporting a vulnerability
 
-If you find a security vulnerability, please contact Voyager006#8530 on Discord. If this mean of contact is not possible, email voyager006@outlook.com. If you don't receive a response in 24 hours, feel free to send another message to ensure it has been received.
+If you find a security vulnerability, please contact Voyager006#8530 on Discord. If this way of contact is not possible, contact the [TMX Admin and Mod Team](https://united.tm-exchange.com/?action=postupdate&id=contactus) or email voyager006@outlook.com. If you don't receive a response in 24 hours, feel free to send another message to ensure it has been received.
 
 Vulnerabilities may include
 
