@@ -3740,7 +3740,7 @@ class KnockoutRuntime
                     }
                     elseif (isset($args[2]))
                     {
-                        $onError('Syntax error: too many arguments ($x%s$x, expected $x/ko start$x or $x/ko start now$x)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko start$x or $x/ko start now$x)');
                     }
                     elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
                     {
@@ -3754,9 +3754,9 @@ class KnockoutRuntime
                         {
                             $onError('Knockout does not work in Cup mode');
                         }
-                        // only 1 player? WTF!?! MrA demands moarrr
                         elseif (count($players) <= 1) {
-                            $onError('Knockout requires multiple players');
+                            // only 1 player? WTF!?! MrA demands moarrr
+                            $onError('Knockout requires at least 2 players');
                         }
                         else
                         {
@@ -3775,7 +3775,7 @@ class KnockoutRuntime
                 case 'stop':
                     if (isset($args[1]))
                     {
-                        $onError('Syntax error: too many arguments ($x%s$x, expected $x/ko stop$x)');
+                        $onError('Syntax error: too many arguments (usage: $x/ko stop$x)');
                     }
                     elseif ($this->koStatus === KnockoutStatus::Idle)
                     {
