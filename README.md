@@ -1,7 +1,7 @@
 # GeryKnockout
 Knockout plugin for the TMGery server controller.
 
-[CLI reference](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md) | [User guide](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md) | [Report a bug](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=bug&template=bug_report.md&title=) | [Suggest a feature](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=new+feature&template=feature_request.md&title=)
+[CLI reference](docs/cli.md) | [User guide](docs/user-guide.md) | [Report a bug](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=bug&template=bug_report.md&title=) | [Suggest a feature](https://github.com/ManiaExchange/GeryKnockout/issues/new?assignees=&labels=new+feature&template=feature_request.md&title=)
 
 ## About
 This repository contains a plugin for TMGery that enables knockout competitions to be held. Each round, the last players are knocked out until one player remains. This plugin is used in the TMX Knockout United event, hosted every Friday at 22:00 CE(S)T in TrackMania United Forever.
