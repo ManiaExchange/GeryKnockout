@@ -1438,6 +1438,24 @@ class UI
                 return sprintf('%d:%02d.%02d', $minutes, $seconds, $centiseconds);
             }
         };
+        $positionWidth = function($position)
+        {
+            switch (strlen($position))
+            {
+                case 1: return 1.5;
+                case 2: return 2.4;
+                case 3: return 3.3;
+                default: return 4.2;
+            }
+        };
+        $scoreWidth = function($score)
+        {
+            $length = strlen($score);
+            if ($length >= 10) return 8.3;      // 1:00:00.00
+            elseif ($length >= 8) return 7.0;   //   10:00.00
+            elseif ($length >= 7) return 6.0;   //    1:00.00
+            else return 4.3;                    //        DNF
+        };
 
         $format = function($timeOrScore) use($gameMode, $formatTime)
         {
@@ -1462,17 +1480,33 @@ class UI
         $padding = $notFinished > 0 ? array_fill(0, $notFinished, null) : array();
         $scoresFormatted = array_merge($nonDNFs, $padding, $DNFs);
 
-        $box = function($index, $row) use($scoresFormatted, $getPlacementColor, $format)
+        $box = function($index, $row) use($scoresFormatted, $getPlacementColor, $format, $positionWidth, $scoreWidth)
         {
             $score = $scoresFormatted[$index];
             $height = 20.25 - 4.5 * $row;
+            $color = $getPlacementColor($score['Score'], $index);
+            $placement = $index + 1;
+            $posWidth = $positionWidth($placement);
+            $nickName = $score['NickName'];
+            $score = $format($score['Score']);
+            $width = $scoreWidth($score);
             if (isset($score))
             {
+                // return '
+                //     <frame posn="-12 ' . $height . ' 1">
+                //         <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $getPlacementColor($score['Score'], $index) . '" />
+                //         <label posn="-11 0 1" sizen="2.5 4" halign="left" valign="center" scale="1.0" text="$fff' . ($index + 1) . '." />
+                //         <label posn="-3.5 0 1" sizen="5.5 4" halign="right" valign="center" scale="1.0" text="$fff' . $format($score['Score']) . '" />
+                //         <label posn="-2.5 0 1" sizen="13 4" halign="left" valign="center" scale="1.0" text="$fff' . $score['NickName'] . '" />
+                //         <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" />
+                //     </frame>
+                // ';
                 return '
                     <frame posn="-12 ' . $height . ' 1">
-                        <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $getPlacementColor($score['Score'], $index) . '" />
-                        <label posn="-5.5 0 1" sizen="5.5 4" halign="right" valign="center" scale="1.0" text="$fff' . $format($score['Score']) . '" />
-                        <label posn="-4.5 0 1" sizen="15 4" halign="left" valign="center" scale="1.0" text="$fff' . $score['NickName'] . '" />
+                        <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $color . '" />
+                        <label posn="-11 0 1" sizen="' . $posWidth . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $placement . '." />
+                        <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $width) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
+                        <label posn="11 0 1" sizen="' . $width . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $score . '" />
                         <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" />
                     </frame>
                 ';
@@ -4856,6 +4890,59 @@ class KnockoutRuntime
     }
 
     /**
+     * @param array $args Arguments to the command.
+     * @param array $issuer A single-element array.
+     *
+     *     $issuer = [
+     *         [0] => (string) The login of the player who issued the command.
+     *         [1] => (string) The nickname of the player who issued the command.
+     *     ]
+     */
+    public function testChatCommand($args, $issuer)
+    {
+        if (isadmin($issuer[0]))
+        {
+            $player1 = array(
+                'Login' => 'player1',
+                'NickName' => 'Dummo|Player 1|teamOne',
+                'Score' => 120000
+            );
+            $player2 = array(
+                'Login' => 'player2',
+                'NickName' => 'Dummo|Player 2|teamOne',
+                'Score' => (120000 * 10)
+            );
+            $player3 = array(
+                'Login' => 'player3',
+                'NickName' => 'Dummo|Player 3|teamOne',
+                'Score' => (120000 * 60)
+            );
+            $player4 = array(
+                'Login' => 'player4',
+                'NickName' => 'Dummo|Player 4|teamOne',
+                'Score' => Scores::DidNotFinish
+            );
+            $empty = array(
+                'Login' => 'none',
+                'NickName' => 'None',
+                'Score' => Scores::DidNotFinish
+            );
+            UI::updateScoreboard(
+                array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty, $empty, $empty),
+                GameMode::Rounds,
+                1,
+                12,
+                $issuer[0]
+            );
+            Chat::info2('test done', array($issuer[0]));
+        }
+        else
+        {
+            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
+        }
+    }
+
+    /**
      * Called when a player clicks on a button.
      *
      * @param array $args Arguments to the command.
@@ -4943,5 +5030,6 @@ $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
 $this->addChatCommand('ko', true, 'adminChatCommands');
 $this->addChatCommand('info', true, 'infoChatCommand');
 $this->addChatCommand('opt', true, 'optChatCommand');
+$this->addChatCommand('test', false, 'testChatCommand');
 
 ?>
