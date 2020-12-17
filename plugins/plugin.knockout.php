@@ -1533,6 +1533,10 @@ class UI
             $i++;
         }
 
+        $separatorLine = $numberOfPlayers > 10
+            ? '<quad posn="0 9 2" sizen="24 0.2" halign="right" valign="center" bgcolor="bbbf" />'
+            : '';
+
         // BgList or BgCardList
         // <frame posn="39.5 25 -2000000">
         return '
@@ -1540,6 +1544,7 @@ class UI
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="64.5 -6.5 -100">
                     ' . $rows . '
+                    ' . $separatorLine . '
                     <quad posn="0 0 -1" sizen="25 47" halign="right" valign="center" style="Bgs1InRace" substyle="BgList" />
                 </frame>
             </manialink>
@@ -4928,10 +4933,10 @@ class KnockoutRuntime
                 'Score' => Scores::DidNotFinish
             );
             UI::updateScoreboard(
-                array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty, $empty, $empty),
+                array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty),
                 GameMode::Rounds,
                 1,
-                12,
+                10,
                 $issuer[0]
             );
             Chat::info2('test done', array($issuer[0]));
