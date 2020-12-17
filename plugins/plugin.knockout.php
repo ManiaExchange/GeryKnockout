@@ -4,7 +4,7 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-const Version = '2.0.2 (beta)';
+const Version = '2.0.2';
 const MinimumLogLevel = Log::Information;
 
 
@@ -4895,59 +4895,6 @@ class KnockoutRuntime
     }
 
     /**
-     * @param array $args Arguments to the command.
-     * @param array $issuer A single-element array.
-     *
-     *     $issuer = [
-     *         [0] => (string) The login of the player who issued the command.
-     *         [1] => (string) The nickname of the player who issued the command.
-     *     ]
-     */
-    public function testChatCommand($args, $issuer)
-    {
-        if (isadmin($issuer[0]))
-        {
-            $player1 = array(
-                'Login' => 'player1',
-                'NickName' => 'Dummo|Player 1|teamOne',
-                'Score' => 120000
-            );
-            $player2 = array(
-                'Login' => 'player2',
-                'NickName' => 'Dummo|Player 2|teamOne',
-                'Score' => (120000 * 10)
-            );
-            $player3 = array(
-                'Login' => 'player3',
-                'NickName' => 'Dummo|Player 3|teamOne',
-                'Score' => (120000 * 60)
-            );
-            $player4 = array(
-                'Login' => 'player4',
-                'NickName' => 'Dummo|Player 4|teamOne',
-                'Score' => Scores::DidNotFinish
-            );
-            $empty = array(
-                'Login' => 'none',
-                'NickName' => 'None',
-                'Score' => Scores::DidNotFinish
-            );
-            UI::updateScoreboard(
-                array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty),
-                GameMode::Rounds,
-                1,
-                10,
-                $issuer[0]
-            );
-            Chat::info2('test done', array($issuer[0]));
-        }
-        else
-        {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
-        }
-    }
-
-    /**
      * Called when a player clicks on a button.
      *
      * @param array $args Arguments to the command.
@@ -5035,6 +4982,5 @@ $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
 $this->addChatCommand('ko', true, 'adminChatCommands');
 $this->addChatCommand('info', true, 'infoChatCommand');
 $this->addChatCommand('opt', true, 'optChatCommand');
-$this->addChatCommand('test', false, 'testChatCommand');
 
 ?>
