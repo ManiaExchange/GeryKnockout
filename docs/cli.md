@@ -1,9 +1,13 @@
 # CLI reference
 
+Commands are case insensitive, logins are case sensitive. Settings carry over across knockouts; default values are applied after a server and/or controller restart.
+
 ## Admin commands
 
+All admin commands for this plugin are available to players defined in both `$admin` and `$admin2` arrays in `includes\tm_gery_config.php`.
+
 ### /ko start [now]
-Starts the knockout. If "now" is given, the current track will be skipped; otherwise the knockout will be scheduled to start on the next round (or after the warmup, if there currently is one). All players will be forced to play unless they opt out using `/opt out`.
+Starts the knockout. If "now" is given, the current track will be skipped; otherwise the knockout will be scheduled to start on the next round (or after the warmup, if there currently is one). All players will be forced to play; inactive players need to opt out using `/opt out` or be forced to spec.
 
 ### /ko stop
 Stops the knockout with immediate effect. Knocked out players are put to play; spectating players remain in spec but can choose to leave spectator mode.
@@ -34,17 +38,19 @@ Removes a player with login `login` from the knockout, regardless of how many li
 Examples:
 
 - `/ko remove eyebo` - puts player with login `eyebo` out of the knockout
-- `/ko remove *` - puts everyone who's playing out of the knockout
+- `/ko remove *` - puts everyone out of the knockout
 
 Note: `/ko remove *` will exit a tiebreaker.
 
 Note: if the command was performed during a round and `/ko restart` or `/ko skip` is used afterwards, the player will remain in the knockout.
 
 ### /ko spec (*login* | \*)
-Same as `/ko remove` but instead puts the player into spectator status. Use if a knocked out player is afk and becomes a cause of synchronization delays.
+Same as `/ko remove` but instead puts the player(s) into spectator status. Use if a knocked out player is afk and becomes a cause of synchronization delays.
 
 ### /ko lives (*login* | \*) [[+ | -]*lives*]
-Displays or adjusts the number of lives to use for the knockout. When adjusting, the number of lives may be relative (by using a plus or minus sign in front of the number of lives) or absolute. The change may be applied to a single player (using their login) or to everyone who is currently playing (using the wildcard `*`). Knocked out players are not reinstated unless when specified by a login. If the number of lives is not supplied, the current number of lives for the given player(s) are displayed in chat.
+Displays or adjusts the number of lives to use for the knockout. When adjusting, the number of lives may be relative (by using a plus or minus sign in front of the number of lives) or absolute. The change may be applied to a single player (using their login) or to everyone who is currently playing (using the wildcard `*`). If the number of lives is not supplied, the current number of lives for the given player(s) are displayed in chat.
+
+Players who are knocked out are not reinstated when using `/ko lives *`; the only way to do so is to specify their login.
 
 This command can be used during a knockout; players will get the same number of lives or get knocked out depending on what the new number is set to.
 
@@ -54,14 +60,14 @@ Examples:
 2. `/ko lives eyebo 2` - sets the number of lives to 2 for player with login `eyebo`
 3. `/ko lives eyebo +1` - adds a life to player with login `eyebo`
 4. `/ko lives eyebo -1` - removes a life from player with login `eyebo`
-5. `/ko lives *` - displays the number of lives for players in the knockout
-6. `/ko lives * 2` - sets the number of lives to 2 for players in the knockout
+5. `/ko lives *` - displays the number of lives for players currently participating in the knockout
+6. `/ko lives * 2` - sets the number of lives to 2 for players currently participating in the knockout
 7. `/ko lives * +1` - adds a life to all players
 8. `/ko lives * -1` - removes a life from all players
 
 Examples 6, 7 and 8 will also adjust the value used for subsequent calls to `/ko add`.
 
-Note: `/ko lives * x` will restore lost lives; everyone will have the same amount of lives regardless of how many they lost so far. To avoid this, use `/ko lives * +x` and `/ko lives * -x`.
+Note: `/ko lives * <lives>` will restore lost lives; everyone will have the same amount of lives regardless of how many they lost so far. To avoid this, use `/ko lives * +<lives>` and `/ko lives * -<lives>`.
 
 Default: 1
 

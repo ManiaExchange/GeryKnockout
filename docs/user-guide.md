@@ -133,7 +133,7 @@ First, a base curve `base_curve(r)` is defined. It defines the relative amount o
 
 Then, the goal is to find a discretized, scaled curve `c[r] = [a * base_curve(r)] + 1` such that the sum over `c[r]` for all rounds equals the total number of KOs to be performed. This is done by approximation; we start off with an initial value of `a` and calculate the sum of `c[r]`. If the sum is too small, `a` is incremented; too big and `a` is decremented. This is repeated until we find a value for `a` of which the sum of `c[r]` equals the total number of KOs.
 
-With 40 players, 20 rounds and no unexpected KOs, the number of KOs/round and overall player count will look like the following:
+With 40 players, 20 rounds and no unexpected KOs, the number of KOs per round and overall player count will look like the following:
 
 ![Graphs showing player count and KOs per round with no unexpected KOs](img/dynamic-kos-example-normal-320p.png)
 
@@ -143,7 +143,7 @@ Each round, the curve is recalculated to adjust for any inaccuracies. In the cas
 
 The base curve is defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
 
-Using this approach, we can observe that the number of KOs/round will increase and decrease steadily; the number of KOs/round will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
+Using this approach, we can observe that the number of KOs per round will increase and decrease steadily; the number will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
 
 ### Lives
 Players may be configured to have multiple lives. This can be configured before the start of the knockout, or while a knockout is in progress. By default, each player has 1 life.
@@ -153,7 +153,7 @@ When a player gets last, they will lose a life. If it was their last life, they 
 The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). The number of lives may be relative (by using a + or - sign in front of the number) or absolute.
 
 ### Rounds per track
-If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. KOs will be performed after each round. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0.
+If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. KOs will be performed after each round. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0. Use `/round <x>` to specify the number of rounds per map.
 
 Note: it is recommended to disable tiebreakers and use 1 life for each player to avoid unwanted side effects.
 

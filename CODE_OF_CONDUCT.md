@@ -1,7 +1,6 @@
 # ManiaExchange Rules & Guidelines
 
 ## Our mission statement
-
 - Foster a community spirit conducive to the exchange of ideas
 - Empower creators to share their content with others
 - Be a destination where everyone can compete for the fastest time
@@ -11,7 +10,6 @@
 ## Suggestions
 
 ### Language
-
 We strongly encourage the use of English in all public areas of ManiaExchange. This makes it easier for an international audience to communicate on the site. Regardless of the language you use, please try to write with proper grammar, punctuation and spelling so others can easily use a translation tool if needed.
 
 ## Rules
