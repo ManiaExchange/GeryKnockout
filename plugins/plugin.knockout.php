@@ -1549,7 +1549,7 @@ class UI
                 $posWidth = $positionWidth($placement);
                 $nickName = $score['NickName'];
                 $scoreText = $format($score['Score']);
-                $scrWidth = $scoreWidth($score);
+                $scrWidth = $scoreWidth($score['Score']);
                 // Encode manialink ID with the target playerID
                 $action = Actions::SpectatePlayer + $score['PlayerId'];
                 return '
@@ -1685,7 +1685,7 @@ class UI
     {
         Log::debug('restoring default scoreboard...');
         $manialink = '
-            <manialink id="' . self::Scoreboard . '">
+            <manialink id="' . self::Scoreboard . '"></manialink>
             <custom_ui>
                 <notice visible="true"/>
                 <challenge_info visible="true"/>
