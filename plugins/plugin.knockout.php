@@ -541,8 +541,8 @@ class Text
     /**
      * Inverts the effect of a given formatting tag or a combination of formatting tags.
      *
-     * Using the returned value of this function will 'undo' the changes applied by the parameter
-     * string (with the exception of `$g`, `$m` and `$z`). Examples:
+     * Using the returned value of this function will 'undo' the changes applied by the string
+     * argument (with the exception of `$g`, `$m` and `$z`). Examples:
      *
      * - `$s` -> `$s`
      * - `$w` -> `$m`
@@ -553,7 +553,7 @@ class Text
      * effect of. The string must only contain valid formatting tags; text and `$$` will not be
      * filtered out.
      *
-     * @return string A string that inverts the effect given by the parametered string.
+     * @return string A string that inverts the effect given by the string argument.
      */
     public static function invert($style)
     {
@@ -3795,7 +3795,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko start [now]
+    /**
+     * Command to start a knockout if it's not running. Called with admin privileges; arguments are
+     * not validated.
+     *
+     * Syntax: `/ko start [now]`
+     */
     private function cliStart($args, $onError, $issuerLogin)
     {
         if ($this->koStatus !== KnockoutStatus::Idle)
@@ -3831,7 +3836,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko stop
+    /**
+     * Command to stop a knockout in progress. Called with admin privileges; arguments are not
+     * validated.
+     *
+     * Syntax: `/ko stop`
+     */
     private function cliStop($args, $onError)
     {
         if (isset($args[1]))
@@ -3851,7 +3861,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko skip [warmup]
+    /**
+     * Command to skip the current track or the current warmup. Called with admin privileges;
+     * arguments are not validated.
+     *
+     * Syntax: `/ko skip [warmup]`
+     */
     private function cliSkip($args, $onError)
     {
         if ($this->koStatus === KnockoutStatus::Idle)
@@ -3899,7 +3914,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko restart [warmup]
+    /**
+     * Command to restart the current track or the current warmup. Called with admin privileges;
+     * arguments are not validated.
+     *
+     * Syntax: `/ko restart [warmup]`
+     */
     private function cliRestart($args, $onError)
     {
         if ($this->koStatus === KnockoutStatus::Idle)
@@ -3947,7 +3967,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko add (<login> | *)
+    /**
+     * Command to add a player to the knockout. Called with admin privileges; arguments are not
+     * validated.
+     *
+     * Syntax: `/ko add (<login> | *)`
+     */
     private function cliAdd($args, $onError)
     {
         if ($this->koStatus === KnockoutStatus::Idle)
@@ -4009,8 +4034,14 @@ class KnockoutRuntime
         }
     }
 
-    // /ko remove (<login> | *)
-    // /ko spec (<login> | *)
+    /**
+     * Commands to remove a player from the knockout. Called with admin privileges; arguments are
+     * not validated.
+     *
+     * Syntax:
+     * - `/ko remove (<login> | *)`
+     * - `/ko spec (<login> | *)`
+     */
     private function cliRemove($args, $onError)
     {
         if ($this->koStatus === KnockoutStatus::Idle)
@@ -4112,7 +4143,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko lives (<login> | *) [[+ | -]<lives>]
+    /**
+     * Command to view or set the number of lives for given players. Called with admin privileges;
+     * arguments are not validated.
+     *
+     * Syntax: `/ko lives (<login> | *) [[+ | -]<lives>]`
+     */
     private function cliLives($args, $onError, $issuerLogin)
     {
         if (!isset($args[1]))
@@ -4225,7 +4261,11 @@ class KnockoutRuntime
         }
     }
 
-    // /ko multi (constant <kos> | extra <per_x_players> | dynamic <total_rounds> | none)
+    /**
+     * Command to set the KO multiplier. Called with admin privileges; arguments are not validated.
+     *
+     * Syntax: `/ko multi (constant <kos> | extra <per_x_players> | dynamic <total_rounds> | none)`
+     */
     private function cliMulti($args, $onError)
     {
         if ($this->koStatus === KnockoutStatus::Tiebreaker)
@@ -4362,7 +4402,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko openwarmup (on | off)
+    /**
+     * Command to enable or disable open warmups. Called with admin privileges; arguments are not
+     * validated.
+     *
+     * Syntax: `/ko openwarmup (on | off)`
+     */
     private function cliOpenwarmup($args, $onError)
     {
         if (!isset($args[1]))
@@ -4391,7 +4436,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko falsestart <max_tries>
+    /**
+     * Command to set the domain of which false starts should be activated. Called with admin
+     * privileges; arguments are not validated.
+     *
+     * Syntax: `/ko falsestart <max_tries>`
+     */
     private function cliFalsestart($args, $onError)
     {
         if (!isset($args[1]))
@@ -4429,7 +4479,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko tiebreaker (on | off)
+    /**
+     * Command to enable or disable tiebreakers. Called with admin privileges; arguments are not
+     * validated.
+     *
+     * Syntax: `/ko falsestart <max_tries>`
+     */
     private function cliTiebreaker($args, $onError)
     {
         if (!isset($args[1]))
@@ -4456,7 +4511,12 @@ class KnockoutRuntime
         }
     }
 
-    // /ko authorskip <for_top_x_players>
+    /**
+     * Command to set the domain of which author skips should be activated. Called with admin privileges; arguments are not
+     * validated.
+     *
+     * Syntax: `/ko authorskip <for_top_x_players>`
+     */
     private function cliAuthorskip($args, $onError)
     {
         if (!isset($args[1]))
@@ -4494,7 +4554,11 @@ class KnockoutRuntime
         }
     }
 
-    // /ko settings
+    /**
+     * Command to view knockout settings. Called with admin privileges; arguments are not validated.
+     *
+     * Syntax: `/ko settings`
+     */
     private function cliSettings($args, $onError, $issuerLogin)
     {
         if (isset($args[1]))
@@ -4507,7 +4571,11 @@ class KnockoutRuntime
         }
     }
 
-    // /ko status
+    /**
+     * Command to view debugging info. Called with admin privileges; arguments are not validated.
+     *
+     * Syntax: `/ko status`
+     */
     private function cliStatus($args, $onError, $issuerLogin)
     {
         if (isset($args[1]))
@@ -4544,7 +4612,11 @@ class KnockoutRuntime
         }
     }
 
-    // /ko help
+    /**
+     * Command to view the CLI reference. Called with admin privileges; arguments are not validated.
+     *
+     * Syntax: `/ko help`
+     */
     private function cliHelp($args, $onError, $issuerLogin)
     {
         if (isset($args[1]))
@@ -5027,7 +5099,7 @@ class KnockoutRuntime
     }
 
     /**
-     * Called when a player clicks on a manialink element with the action parameter set.
+     * Called when a player clicks on a manialink element with the action attribute being set.
      *
      * @param array $args Arguments to the command.
      *
