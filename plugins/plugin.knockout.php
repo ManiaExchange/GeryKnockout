@@ -4,7 +4,7 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-const Version = '2.0.2';
+const Version = '2.0.3 (beta)';
 const MinimumLogLevel = Log::Information;
 
 
@@ -112,6 +112,15 @@ class SpectatorMode
     const UserSelectable = 0;
     const Spectator = 1;
     const Player = 2;
+}
+
+
+class CameraType
+{
+    const Unchanged = -1;
+    const Replay = 0;
+    const Follow = 1;
+    const Free = 2;
 }
 
 
@@ -302,6 +311,21 @@ class Log
     {
         if (MinimumLogLevel <= self::Error) self::write('ERR', $message);
     }
+}
+
+
+/**
+ * Links to manialink IDs
+ */
+class Actions
+{
+    const ToggleHUD = 98;
+    const Cancel = 99;
+    const ConfirmOptOut = 501;
+    const CliReferencePage1 = 511;
+    const CliReferencePage2 = 512;
+    const CliReferencePage3 = 513;
+    const SpectatePlayer = 1024; // 1024-1279
 }
 
 
@@ -866,7 +890,7 @@ class Scores
     }
 
     /**
-     * Submits the score of the given player to the scoreboard.
+     * Submits a score set by the given player.
      *
      * If the score is better than the previous one set by $login, the record will be updated. Worse
      * scores are ignored.
@@ -1303,6 +1327,12 @@ class PlayerList
  */
 class UI
 {
+    const StatusBar = 420;
+    const Scoreboard = 430;
+    const Dialog = 440;
+    const MultiPageDialog = 450;
+    const Prompt = 460;
+
     private static function statusBarManialink($playerStatus, $knockoutStatus, $roundNumber, $numberOfPlayers, $numberOfKOs)
     {
         Log::debug(sprintf('statusBarManialink %d %d %d %d %d', $playerStatus, $knockoutStatus, $roundNumber, $numberOfPlayers, $numberOfKOs));
@@ -1344,7 +1374,7 @@ class UI
             ';
         };
         return '
-            <manialink id="420">
+            <manialink id="' . self::StatusBar . '">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="0 35 -2000000">
                     <frame posn="-18 0 0">
@@ -1397,7 +1427,7 @@ class UI
      */
     public static function hideStatusBar($logins = null)
     {
-        $manialink = '<manialink id="420"></manialink>';
+        $manialink = '<manialink id="' . self::StatusBar . '"></manialink>';
         if (is_null($logins))
         {
             QueryManager::query('SendDisplayManialinkPage', $manialink, 0, false);
@@ -1489,25 +1519,16 @@ class UI
             $posWidth = $positionWidth($placement);
             $nickName = $score['NickName'];
             $score = $format($score['Score']);
-            $width = $scoreWidth($score);
+            $scrWidth = $scoreWidth($score);
             if (isset($score))
             {
-                // return '
-                //     <frame posn="-12 ' . $height . ' 1">
-                //         <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $getPlacementColor($score['Score'], $index) . '" />
-                //         <label posn="-11 0 1" sizen="2.5 4" halign="left" valign="center" scale="1.0" text="$fff' . ($index + 1) . '." />
-                //         <label posn="-3.5 0 1" sizen="5.5 4" halign="right" valign="center" scale="1.0" text="$fff' . $format($score['Score']) . '" />
-                //         <label posn="-2.5 0 1" sizen="13 4" halign="left" valign="center" scale="1.0" text="$fff' . $score['NickName'] . '" />
-                //         <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" />
-                //     </frame>
-                // ';
                 return '
                     <frame posn="-12 ' . $height . ' 1">
                         <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $color . '" />
                         <label posn="-11 0 1" sizen="' . $posWidth . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $placement . '." />
-                        <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $width) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
-                        <label posn="11 0 1" sizen="' . $width . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $score . '" />
-                        <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" />
+                        <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $scrWidth) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
+                        <label posn="11 0 1" sizen="' . $scrWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $score . '" />
+                        <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" action="" />
                     </frame>
                 ';
             }
@@ -1540,7 +1561,7 @@ class UI
         // BgList or BgCardList
         // <frame posn="39.5 25 -2000000">
         return '
-            <manialink id="430">
+            <manialink id="' . self::Scoreboard . '">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="64.5 -6.5 -100">
                     ' . $rows . '
@@ -1589,7 +1610,7 @@ class UI
     private static function emptyScoreboardManialink()
     {
         return '
-            <manialink id="430">
+            <manialink id="' . self::Scoreboard . '">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="64.5 -6.5 -100"></frame>
             </manialink>
@@ -1634,7 +1655,7 @@ class UI
     {
         Log::debug('restoring default scoreboard...');
         $manialink = '
-            <manialink id="430"></manialink>
+            <manialink id="' . self::Scoreboard . '">
             <custom_ui>
                 <notice visible="true"/>
                 <challenge_info visible="true"/>
@@ -1659,7 +1680,7 @@ class UI
     {
         if (is_string($logins)) $logins = array($logins);
         $manialink = '
-            <manialink id="440">
+            <manialink id="' . self::Dialog . '">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="-40 43 1">
                     <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
@@ -1695,7 +1716,7 @@ class UI
             ? '<quad posn="5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="StarGold" />'
             : '<quad posn="5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="ArrowNext" action="' . $nextPageActionId . '" />';
         $manialink = '
-            <manialink id="440">
+            <manialink id="' . self::MultiPageDialog . '">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="-40 43 1">
                     <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
@@ -1730,7 +1751,7 @@ class UI
         $textboxHeight = $nbLines * 2.5;
         $print = function($value) { return sprintf('%1.1f', $value); };
         $manialink = '
-            <manialink id="450">
+            <manialink id="' . self::Prompt . '">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="0 0 1">
                     <quad posn="0 0 0" sizen="64.8 ' . $print($textboxHeight + 12.0) . '" halign="center" valign="center" style="Bgs1" substyle="BgWindow3" />
@@ -2043,7 +2064,7 @@ function isOnServer($login)
 
 
 /**
- * Tests if the given player has Tm-Gery HUD enabled. If the player is not found, false is returned.
+ * Tests if the given player has TMGery HUD enabled. If the player is not found, false is returned.
  *
  * @param string $login The login of the player.
  *
@@ -2200,7 +2221,7 @@ function isForced($player)
 
 
 /**
- * The main runtime to be attached to Tm-Gery's plugin manager.
+ * The main runtime to be attached to the plugin manager.
  */
 class KnockoutRuntime
 {
@@ -2258,7 +2279,7 @@ class KnockoutRuntime
     }
 
     /**
-     * Callback method for when Tm-Gery is starting up.
+     * Callback method for when TMGery is starting up.
      */
     public function onControllerStartup()
     {
@@ -2275,6 +2296,8 @@ class KnockoutRuntime
         UI::hideStatusBar();
         UI::restoreDefaultScoreboard();
         forcePlay(logins($PlayerList), false);
+        $timeout = QueryManager::queryWithResponse('GetCallVoteTimeOut');
+        $this->defaultVoteTimeout = $timeout['CurrentValue'];
         QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
         if ($RoundCustomPoints === 1)
         {
@@ -2314,7 +2337,7 @@ class KnockoutRuntime
 
     private function updateStatusBar($login = null)
     {
-        // Make KO GUI optional together with Tm-Gery GUI
+        // Make KO GUI optional together with TMGery GUI
         $playersWithHudOn = array();
         if ($login !== null)
         {
@@ -4673,7 +4696,14 @@ class KnockoutRuntime
                         'Displays or adjusts the number of lives to use for the knockout.'
                     ))
                 ));
-                UI::showMultiPageDialog(Text::info("{$prefix}{$text}", '$i', '$s', false), $login, 1, $totalPages, null, 462);
+                UI::showMultiPageDialog(
+                    Text::info("{$prefix}{$text}", '$i', '$s', false),
+                    $login,
+                    1,
+                    $totalPages,
+                    null,
+                    Actions::CliReferencePage2
+                );
                 break;
 
             case 2:
@@ -4714,7 +4744,14 @@ class KnockoutRuntime
                         'Automatically skips a track when its author is present, once a given player count has been reached.'
                     ))
                 ));
-                UI::showMultiPageDialog(Text::info("{$prefix}{$text}", '$i', '$s', false), $login, 2, $totalPages, 461, 463);
+                UI::showMultiPageDialog(
+                    Text::info("{$prefix}{$text}", '$i', '$s', false),
+                    $login,
+                    2,
+                    $totalPages,
+                    Actions::CliReferencePage1,
+                    Actions::CliReferencePage3
+                );
                 break;
 
             case 3:
@@ -4738,7 +4775,14 @@ class KnockoutRuntime
 
                     '$4af$l[http://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md]User guide$l'
                 ));
-                UI::showMultiPageDialog(Text::info("{$prefix}{$text}", '$i', '$s', false), $login, 3, $totalPages, 462, null);
+                UI::showMultiPageDialog(
+                    Text::info("{$prefix}{$text}", '$i', '$s', false),
+                    $login,
+                    3,
+                    $totalPages,
+                    Actions::CliReferencePage2,
+                    null
+                );
                 break;
 
             default:
@@ -4878,7 +4922,7 @@ class KnockoutRuntime
                 if (PlayerStatus::isIn($playerObj['Status']) || PlayerStatus::isShelved($playerObj['Status']))
                 {
                     $text = 'Are you sure you want to opt out of the knockout?';
-                    UI::showPrompt($text, 451, $issuerLogin);
+                    UI::showPrompt($text, Actions::ConfirmOptOut, $issuerLogin);
                 }
                 else
                 {
@@ -4891,6 +4935,59 @@ class KnockoutRuntime
         {
             $msg = sprintf('Syntax error: unexpected argument $x%s$x (expected $x/opt out$x)', $args[0]);
             Chat::error($msg, $issuerLogin);
+        }
+    }
+
+    /**
+     * @param array $args Arguments to the command.
+     * @param array $issuer A single-element array.
+     *
+     *     $issuer = [
+     *         [0] => (string) The login of the player who issued the command.
+     *         [1] => (string) The nickname of the player who issued the command.
+     *     ]
+     */
+    public function testChatCommand($args, $issuer)
+    {
+        if (isadmin($issuer[0]))
+        {
+            $player1 = array(
+                'Login' => 'player1',
+                'NickName' => 'Dummo|Player 1|teamOne',
+                'Score' => 120000
+            );
+            $player2 = array(
+                'Login' => 'player2',
+                'NickName' => 'Dummo|Player 2|teamOne',
+                'Score' => (120000 * 10)
+            );
+            $player3 = array(
+                'Login' => 'player3',
+                'NickName' => 'Dummo|Player 3|teamOne',
+                'Score' => (120000 * 60)
+            );
+            $player4 = array(
+                'Login' => 'player4',
+                'NickName' => 'Dummo|Player 4|teamOne',
+                'Score' => Scores::DidNotFinish
+            );
+            $empty = array(
+                'Login' => 'none',
+                'NickName' => 'None',
+                'Score' => Scores::DidNotFinish
+            );
+            UI::updateScoreboard(
+                array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty),
+                GameMode::Rounds,
+                1,
+                10,
+                $issuer[0]
+            );
+            Chat::info2('test done', array($issuer[0]));
+        }
+        else
+        {
+            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
         }
     }
 
@@ -4914,7 +5011,7 @@ class KnockoutRuntime
         switch ($args[2])
         {
             // TMGery GUI button
-            case 98:
+            case Actions::ToggleHUD:
                 // TMGery has already changed the state of PlayerScript by now
                 if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
                 {
@@ -4930,7 +5027,7 @@ class KnockoutRuntime
                 break;
 
             // /opt out -> Yes
-            case 451:
+            case Actions::ConfirmOptOut:
                 $playerObj = $this->playerList->get($login);
                 if (($this->koStatus === KnockoutStatus::Running && !$this->isPodium)
                     || ($this->koStatus === KnockoutStatus::Tiebreaker && $playerObj['Status'] === PlayerStatus::Playing))
@@ -4947,17 +5044,17 @@ class KnockoutRuntime
                 break;
 
             // /ko help (page 1)
-            case 461:
+            case Actions::CliReferencePage1:
                 $this->cliReference(1, $login);
                 break;
 
             // /ko help (page 2)
-            case 462:
+            case Actions::CliReferencePage2:
                 $this->cliReference(2, $login);
                 break;
 
             // /ko help (page 3)
-            case 463:
+            case Actions::CliReferencePage3:
                 $this->cliReference(3, $login);
                 break;
         }
@@ -4982,5 +5079,6 @@ $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
 $this->addChatCommand('ko', true, 'adminChatCommands');
 $this->addChatCommand('info', true, 'infoChatCommand');
 $this->addChatCommand('opt', true, 'optChatCommand');
+$this->addChatCommand('test', false, 'testChatCommand');
 
 ?>
