@@ -326,6 +326,7 @@ class Actions
     const CliReferencePage2 = 512;
     const CliReferencePage3 = 513;
     const SpectatePlayer = 1024; // 1024-1279
+    const SpectatePlayerMax = 1279;
 }
 
 
@@ -898,7 +899,7 @@ class Scores
      * scores are ignored.
      *
      * @param string $login The login of the player.
-     * @param int $playerId The player ID.
+     * @param int $playerId The player UID.
      * @param string $nickName The nickname of the player.
      * @param int $score The player's score.
      */
@@ -999,7 +1000,7 @@ class Scores
      * only be used for administrative operations as it is less performant than submitScore.
      *
      * @param string $login The login of the player.
-     * @param int $playerId The player ID.
+     * @param int $playerId The player UID.
      * @param string $nickName The nickname of the player.
      * @param int $score The time or score of the player.
      */
@@ -1200,7 +1201,7 @@ class PlayerList
     }
 
     /**
-     * Updates the player ID of the given player.
+     * Updates the player UID of the given player.
      *
      * @param string $login The login of the player.
      * @param int $playerId The new player ID.
@@ -1539,23 +1540,24 @@ class UI
 
         $box = function($index, $row) use($scoresFormatted, $getPlacementColor, $format, $positionWidth, $scoreWidth)
         {
-            $score = $scoresFormatted[$index];
-            $height = 20.25 - 4.5 * $row;
-            $color = $getPlacementColor($score['Score'], $index);
-            $placement = $index + 1;
-            $posWidth = $positionWidth($placement);
-            $nickName = $score['NickName'];
-            $score = $format($score['Score']);
-            $scrWidth = $scoreWidth($score);
-            $action = Actions::SpectatePlayer + $score['PlayerId'];
-            if (isset($score))
+            if (array_key_exists($index, $scoresFormatted))
             {
+                $score = $scoresFormatted[$index];
+                $height = 20.25 - 4.5 * $row;
+                $color = $getPlacementColor($score['Score'], $index);
+                $placement = $index + 1;
+                $posWidth = $positionWidth($placement);
+                $nickName = $score['NickName'];
+                $scoreText = $format($score['Score']);
+                $scrWidth = $scoreWidth($score);
+                // Encode manialink ID with the target playerID
+                $action = Actions::SpectatePlayer + $score['PlayerId'];
                 return '
                     <frame posn="-12 ' . $height . ' 1">
                         <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $color . '" />
                         <label posn="-11 0 1" sizen="' . $posWidth . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $placement . '." />
                         <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $scrWidth) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
-                        <label posn="11 0 1" sizen="' . $scrWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $score . '" />
+                        <label posn="11 0 1" sizen="' . $scrWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $scoreText . '" />
                         <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" action="' . $action . '" />
                     </frame>
                 ';
@@ -4862,7 +4864,7 @@ class KnockoutRuntime
             )),
 
             implode("\n", array(
-                'If you experience a disconnection, you may get reinstated only if you haven\'t been knocked out yet and,',
+                "If you experience a disconnection, you may get reinstated only if you haven't been knocked out yet and,",
                 'without missing any rounds,',
                 '    - rejoin during the warmup (Rounds, Laps)',
                 '    - rejoin with time to spare (Time Attack, Stunts)'
@@ -4985,26 +4987,31 @@ class KnockoutRuntime
         {
             $player1 = array(
                 'Login' => 'player1',
+                'PlayerId' => '1',
                 'NickName' => 'Dummo|Player 1|teamOne',
                 'Score' => 120000
             );
             $player2 = array(
                 'Login' => 'player2',
+                'PlayerId' => '2',
                 'NickName' => 'Dummo|Player 2|teamOne',
                 'Score' => (120000 * 10)
             );
             $player3 = array(
                 'Login' => 'player3',
+                'PlayerId' => '3',
                 'NickName' => 'Dummo|Player 3|teamOne',
                 'Score' => (120000 * 60)
             );
             $player4 = array(
                 'Login' => 'player4',
+                'PlayerId' => '4',
                 'NickName' => 'Dummo|Player 4|teamOne',
                 'Score' => Scores::DidNotFinish
             );
             $empty = array(
                 'Login' => 'none',
+                'PlayerId' => '5',
                 'NickName' => 'None',
                 'Score' => Scores::DidNotFinish
             );
@@ -5024,7 +5031,7 @@ class KnockoutRuntime
     }
 
     /**
-     * Called when a player clicks on a button.
+     * Called when a player clicks on a manialink element with the action parameter set.
      *
      * @param array $args Arguments to the command.
      *
@@ -5039,10 +5046,11 @@ class KnockoutRuntime
         global $PlayerScript;
         Log::debug(sprintf('playerManialinkPageAnswer %s', implode(' ', $args)));
 
+        $playerId = $args[0];
         $login = $args[1];
-        switch ($args[2])
+        $manialinkId = $args[2];
+        switch ($manialinkId)
         {
-            // TMGery GUI button
             case Actions::ToggleHUD:
                 // TMGery has already changed the state of PlayerScript by now
                 if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
@@ -5058,7 +5066,6 @@ class KnockoutRuntime
                 }
                 break;
 
-            // /opt out -> Yes
             case Actions::ConfirmOptOut:
                 $playerObj = $this->playerList->get($login);
                 if (($this->koStatus === KnockoutStatus::Running && !$this->isPodium)
@@ -5075,19 +5082,25 @@ class KnockoutRuntime
                 Chat::info(sprintf('$x%s$z has opted out of the knockout', $playerObj['NickName']));
                 break;
 
-            // /ko help (page 1)
             case Actions::CliReferencePage1:
                 $this->cliReference(1, $login);
                 break;
 
-            // /ko help (page 2)
             case Actions::CliReferencePage2:
                 $this->cliReference(2, $login);
                 break;
 
-            // /ko help (page 3)
             case Actions::CliReferencePage3:
                 $this->cliReference(3, $login);
+                break;
+
+            default:
+                if ($manialinkId >= Actions::SpectatePlayer && $manialinkId <= Actions::SpectatePlayerMax)
+                {
+                    // Manialink ID is encoded with the target playerID (Manialink ID + Player ID)
+                    $target = $manialinkId - Actions::SpectatePlayer;
+                    QueryManager::query('ForceSpectatorTargetId', $playerId, $target, CameraType::Unchanged);
+                }
                 break;
         }
     }
