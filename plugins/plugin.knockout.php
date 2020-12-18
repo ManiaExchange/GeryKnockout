@@ -1549,7 +1549,7 @@ class UI
                 $posWidth = $positionWidth($placement);
                 $nickName = $score['NickName'];
                 $scoreText = $format($score['Score']);
-                $scrWidth = $scoreWidth($score['Score']);
+                $scrWidth = $scoreWidth($scoreText);
                 // Encode manialink ID with the target playerID
                 $action = Actions::SpectatePlayer + $score['PlayerId'];
                 return '
