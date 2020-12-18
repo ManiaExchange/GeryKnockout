@@ -3818,10 +3818,6 @@ class KnockoutRuntime
             {
                 $onError('Knockout does not work in Cup mode');
             }
-            elseif (count($players) <= 1) {
-                // only 1 player? WTF!?! MrA demands moarrr
-                $onError('Knockout requires at least 2 players');
-            }
             else
             {
                 $this->start($players, isset($args[1]) && $args[1] === 'now');
