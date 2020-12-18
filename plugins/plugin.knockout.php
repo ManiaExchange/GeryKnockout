@@ -445,11 +445,16 @@ class Text
      * Finds and replaces formatting tags in a string using a callback function.
      *
      * @param string $text The text to modify.
-     * @param Callable $callback A function to replace found tags with. It must support at least one
-     * argument, the argument being the tag string that was found. Its capitalization is unaltered.
+     * @param Callable $callback A function to replace found tags with.
+     *
+     * It must support at least one argument, the argument being the tag string that was found. Its
+     * capitalization is unaltered. For `$h`, `$l` and `$p` tags, an optional link is included in
+     * the argument (e.g. `$l[website.com]`).
+     *
      * For tags except `$000`-`$fff`, `$g`, `$m` and `$z`, a second argument is used; a boolean
-     * indicating whether it is the opening tag or not. The function should return a string; the
-     * replacement for the given tag.
+     * indicating whether it is the opening tag or not.
+     *
+     * The function should return a string; the replacement for the given tag.
      *
      * @return string The input string with tags replaced according to the callback function.
      */
@@ -459,28 +464,65 @@ class Text
         $length = strlen($text);
         $result = '';
         $openedTags = array();
+        $registerTag = function($tag, $checkIfItsAnOpeningTag) use(&$result, $callback, &$index, &$openedTags)
+        {
+            if ($checkIfItsAnOpeningTag)
+            {
+                $key = substr($tag, 0, 2);
+                $openedTags[$key] = isset($openedTags[$key]) ? !$openedTags[$key] : true;
+                $result .= $callback($tag, $openedTags[$key]);
+            }
+            else
+            {
+                $result .= $callback($tag, null);
+            }
+            $index += strlen($tag);
+        };
+
         while ($index < $length)
         {
             $current = $text[$index];
             if ($current === '$')
             {
-                if ($index === $length - 1)
+                if (!isset($text[$index + 1]))
                 {
-                    return $result;
+                    $registerTag('$', false);
                 }
                 else
                 {
                     $next = $text[$index + 1];
                     if (preg_match('/[0-9a-f]/i', $next))
                     {
-                        $result .= $callback(substr($text, $index, 4), null);
-                        $index += 4;
+                        $tag = substr($text, $index, 4);
+                        $registerTag($tag, false);
                     }
                     elseif (preg_match('/[gmz]/i', $next))
                     {
                         if ($next === 'z') $openedTags = array();
-                        $result .= $callback('$' . $next, null);
-                        $index += 2;
+                        $tag = '$' . $next;
+                        $registerTag($tag, false);
+                    }
+                    elseif (preg_match('/[hlp]/i', $next))
+                    {
+                        if (isset($text[$index + 2]) && $text[$index + 2] === '[')
+                        {
+                            $endIndex = strpos($text, ']', $index + 3);
+                            if ($endIndex !== false)
+                            {
+                                $tag = substr($text, $index, $endIndex + 1 - $index);
+                                $registerTag($tag, true);
+                            }
+                            else
+                            {
+                                $tag = '$' . $next;
+                                $registerTag($tag, true);
+                            }
+                        }
+                        else
+                        {
+                            $tag = '$' . $next;
+                            $registerTag($tag, true);
+                        }
                     }
                     elseif ($next === '$')
                     {
@@ -490,9 +532,7 @@ class Text
                     else
                     {
                         $tag = '$' . $next;
-                        $openedTags[$tag] = isset($openedTags[$tag]) ? !$openedTags[$tag] : true;
-                        $result .= $callback($tag, $openedTags[$tag]);
-                        $index += 2;
+                        $registerTag($tag, true);
                     }
                 }
             }
@@ -557,8 +597,8 @@ class Text
      */
     public static function invert($style)
     {
-        $search = array('/\$[gmz]/i', '/\$n/i', '/\$w/i', '/\$[0-9a-f].{0,2}/i');
-        $replace = array("", "\$m", "\$m", "\$g");
+        $search = array('/\$[gmz]/i', '/\$n/i', '/\$w/i', '/\$[0-9a-f].{0,2}/i', '/\$([hlp])\[.*\]/i');
+        $replace = array("", "\$m", "\$m", "\$g", "\$/1");
         return preg_replace($search, $replace, $style);
     }
 
@@ -2327,8 +2367,10 @@ class KnockoutRuntime
         UI::restoreDefaultScoreboard();
         forcePlay(logins($PlayerList), false);
         $timeout = QueryManager::queryWithResponse('GetCallVoteTimeOut');
-        $this->defaultVoteTimeout = $timeout['CurrentValue'];
-        QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
+        if ($timeout['CurrentValue'] === 0)
+        {
+            QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
+        }
         if ($RoundCustomPoints === 1)
         {
             $this->defaultPointPartition = $CustomPoints;
@@ -4908,10 +4950,7 @@ class KnockoutRuntime
     {
         $login = $issuer[0];
         $text = implode("\n\n", array(
-            implode("\n", array(
-                '$s',
-                '$oAbout the TM$f00X$g Knockout United$o'
-            )),
+            '$oAbout the TM$f00X$g Knockout United$o',
 
             implode("\n", array(
                 'The TMX Knockout United is a weekly knockout event designed to be fun! It provides casual gameplay',
@@ -4950,7 +4989,7 @@ class KnockoutRuntime
                 '$l[http://discordapp.com/invite/Ttkw54Y]TMX Discord$l'
             )),
         ));
-        UI::showInfoDialog($text, $login);
+        UI::showInfoDialog(Text::info(" \n$text"), $login);
     }
 
     /**
@@ -5041,64 +5080,6 @@ class KnockoutRuntime
     }
 
     /**
-     * @param array $args Arguments to the command.
-     * @param array $issuer A single-element array.
-     *
-     *     $issuer = [
-     *         [0] => (string) The login of the player who issued the command.
-     *         [1] => (string) The nickname of the player who issued the command.
-     *     ]
-     */
-    public function testChatCommand($args, $issuer)
-    {
-        if (isadmin($issuer[0]))
-        {
-            $player1 = array(
-                'Login' => 'player1',
-                'PlayerId' => '1',
-                'NickName' => 'Dummo|Player 1|teamOne',
-                'Score' => 120000
-            );
-            $player2 = array(
-                'Login' => 'player2',
-                'PlayerId' => '2',
-                'NickName' => 'Dummo|Player 2|teamOne',
-                'Score' => (120000 * 10)
-            );
-            $player3 = array(
-                'Login' => 'player3',
-                'PlayerId' => '3',
-                'NickName' => 'Dummo|Player 3|teamOne',
-                'Score' => (120000 * 60)
-            );
-            $player4 = array(
-                'Login' => 'player4',
-                'PlayerId' => '4',
-                'NickName' => 'Dummo|Player 4|teamOne',
-                'Score' => Scores::DidNotFinish
-            );
-            $empty = array(
-                'Login' => 'none',
-                'PlayerId' => '5',
-                'NickName' => 'None',
-                'Score' => Scores::DidNotFinish
-            );
-            UI::updateScoreboard(
-                array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty),
-                GameMode::Rounds,
-                1,
-                10,
-                $issuer[0]
-            );
-            Chat::info2('test done', array($issuer[0]));
-        }
-        else
-        {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
-        }
-    }
-
-    /**
      * Called when a player clicks on a manialink element with the action attribute being set.
      *
      * @param array $args Arguments to the command.
@@ -5170,6 +5151,65 @@ class KnockoutRuntime
                     QueryManager::query('ForceSpectatorTargetId', $playerId, $target, CameraType::Unchanged);
                 }
                 break;
+        }
+    }
+
+    /**
+     * @param array $args Arguments to the command.
+     * @param array $issuer A single-element array.
+     *
+     *     $issuer = [
+     *         [0] => (string) The login of the player who issued the command.
+     *         [1] => (string) The nickname of the player who issued the command.
+     *     ]
+     */
+    public function testChatCommand($args, $issuer)
+    {
+        if (isadmin($issuer[0]))
+        {
+            // $player1 = array(
+            //     'Login' => 'player1',
+            //     'PlayerId' => '1',
+            //     'NickName' => 'Dummo|Player 1|teamOne',
+            //     'Score' => 120000
+            // );
+            // $player2 = array(
+            //     'Login' => 'player2',
+            //     'PlayerId' => '2',
+            //     'NickName' => 'Dummo|Player 2|teamOne',
+            //     'Score' => (120000 * 10)
+            // );
+            // $player3 = array(
+            //     'Login' => 'player3',
+            //     'PlayerId' => '3',
+            //     'NickName' => 'Dummo|Player 3|teamOne',
+            //     'Score' => (120000 * 60)
+            // );
+            // $player4 = array(
+            //     'Login' => 'player4',
+            //     'PlayerId' => '4',
+            //     'NickName' => 'Dummo|Player 4|teamOne',
+            //     'Score' => Scores::DidNotFinish
+            // );
+            // $empty = array(
+            //     'Login' => 'none',
+            //     'PlayerId' => '5',
+            //     'NickName' => 'None',
+            //     'Score' => Scores::DidNotFinish
+            // );
+            // UI::updateScoreboard(
+            //     array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty),
+            //     GameMode::Rounds,
+            //     1,
+            //     10,
+            //     $issuer[0]
+            // );
+            // Chat::info2('test done', array($issuer[0]));
+            Chat::info2(Text::clean(implode(' ', $args)), $issuer[0]);
+        }
+        else
+        {
+            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
         }
     }
 }
