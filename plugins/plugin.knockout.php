@@ -842,7 +842,8 @@ class Scores
      * Initializes the scores by setting the scores of the specified logins to 0. Usually done for
      * Time Attack and Stunts.
      *
-     * @param array $logins An array of players, each with fields 'Login' and 'NickName'.
+     * @param array $logins An array of players, each with fields 'Login', 'PlayerId' and
+     * 'NickName'.
      */
     public function initialize($players)
     {
@@ -850,6 +851,7 @@ class Scores
         {
             array(
                 'Login' => $player['Login'],
+                'PlayerId' => $player['PlayerId'],
                 'NickName' => $player['NickName'],
                 'Score' => 0
             );
@@ -896,10 +898,11 @@ class Scores
      * scores are ignored.
      *
      * @param string $login The login of the player.
+     * @param int $playerId The player ID.
      * @param string $nickName The nickname of the player.
      * @param int $score The player's score.
      */
-    public function submitScore($login, $nickName, $score)
+    public function submitScore($login, $playerId, $nickName, $score)
     {
         $logins = array_map(
             function($score) { return $score['Login']; },
@@ -910,6 +913,7 @@ class Scores
         {
             $this->scores[] = array(
                 'Login' => $login,
+                'PlayerId' => $playerId,
                 'NickName' => $nickName,
                 'Score' => $score
             );
@@ -922,6 +926,7 @@ class Scores
             {
                 $this->scores[$index] = array(
                     'Login' => $login,
+                    'PlayerId' => $playerId,
                     'NickName' => $nickName,
                     'Score' => $score
                 );
@@ -936,6 +941,7 @@ class Scores
                 {
                     $this->scores[$index] = array(
                         'Login' => $login,
+                        'PlayerId' => $playerId,
                         'NickName' => $nickName,
                         'Score' => $score
                     );
@@ -993,10 +999,11 @@ class Scores
      * only be used for administrative operations as it is less performant than submitScore.
      *
      * @param string $login The login of the player.
+     * @param int $playerId The player ID.
      * @param string $nickName The nickname of the player.
      * @param int $score The time or score of the player.
      */
-    public function set($login, $nickName, $score)
+    public function set($login, $playerId, $nickName, $score)
     {
         $logins = array_map(
             function($player) { return $player['Login']; },
@@ -1005,12 +1012,13 @@ class Scores
         $index = array_search($login, $logins, true);
         if ($index === false)
         {
-            $this->submitScore($login, $nickName, $score);
+            $this->submitScore($login, $playerId, $nickName, $score);
         }
         else
         {
             $this->scores[$index] = array(
                 'Login' => $login,
+                'PlayerId' => $playerId,
                 'NickName' => $nickName,
                 'Score' => $score
             );
@@ -1053,10 +1061,11 @@ class PlayerList
      * PlayerStatus::Playing.
      * @param int $lives [Optional] The number of lives the player should have. Default is 1.
      */
-    public function add($login, $nickName, $status = PlayerStatus::Playing, $lives = 1)
+    public function add($login, $playerId, $nickName, $status = PlayerStatus::Playing, $lives = 1)
     {
         $this->players[$login] = array(
             'Login' => $login,
+            'PlayerId' => $playerId,
             'NickName' => $nickName,
             'Status' => $status,
             'Lives' => $lives
@@ -1068,7 +1077,7 @@ class PlayerList
      * replaced.
      *
      * @param mixed[] $players An array of players to add, each element being an array with at least
-     * the fields 'Login' and 'NickName'.
+     * the fields 'Login', 'PlayerId' and 'NickName'.
      * @param PlayerStatus $status [Optional] The status of the players. Default is
      * PlayerStatus::Playing.
      * @param int $lives [Optional] The number of lives each player should have. Default is 1.
@@ -1077,7 +1086,7 @@ class PlayerList
     {
         foreach ($players as $player)
         {
-            $this->add($player['Login'], $player['NickName'], $status, $lives);
+            $this->add($player['Login'], $player['PlayerId'], $player['NickName'], $status, $lives);
         }
     }
 
@@ -1191,10 +1200,28 @@ class PlayerList
     }
 
     /**
+     * Updates the player ID of the given player.
+     *
+     * @param string $login The login of the player.
+     * @param int $playerId The new player ID.
+     */
+    public function setPlayerId($login, $playerId)
+    {
+        if (isset($this->players[$login]))
+        {
+            $this->players[$login]['PlayerId'] = $playerId;
+        }
+        else
+        {
+            Log::warning(sprintf('Player %s is not in the player list', $login));
+        }
+    }
+
+    /**
      * Updates the nickname of the given player.
      *
      * @param string $login The login of the player.
-     * @param string $nickname The updated nickname.
+     * @param string $nickname The new nickname.
      */
     public function setNickname($login, $nickname)
     {
@@ -1520,6 +1547,7 @@ class UI
             $nickName = $score['NickName'];
             $score = $format($score['Score']);
             $scrWidth = $scoreWidth($score);
+            $action = Actions::SpectatePlayer + $score['PlayerId'];
             if (isset($score))
             {
                 return '
@@ -1528,7 +1556,7 @@ class UI
                         <label posn="-11 0 1" sizen="' . $posWidth . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $placement . '." />
                         <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $scrWidth) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
                         <label posn="11 0 1" sizen="' . $scrWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $score . '" />
-                        <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" action="" />
+                        <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" action="' . $action . '" />
                     </frame>
                 ';
             }
@@ -2545,7 +2573,8 @@ class KnockoutRuntime
             if (!$this->playerList->exists($login))
             {
                 $nickname = $player['NickName'];
-                $this->playerList->add($login, $nickname, $status, $this->lives);
+                $playerId = $player['PlayerId'];
+                $this->playerList->add($login, $playerId, $nickname, $status, $this->lives);
                 if ($isTiebreaker)
                 {
                     $toSpec[] = $login;
@@ -2582,7 +2611,8 @@ class KnockoutRuntime
             if (!$this->playerList->exists($login))
             {
                 $nickname = $player['NickName'];
-                $this->playerList->add($login, $nickname, $status, 0);
+                $playerId = $player['PlayerId'];
+                $this->playerList->add($login, $playerId, $nickname, $status, 0);
             }
             else
             {
@@ -2595,7 +2625,7 @@ class KnockoutRuntime
                             && PlayerStatus::isIn($target['Status']);
                         if ($shouldDNF)
                         {
-                            $this->scores->set($login, $target['NickName'], Scores::DidNotFinish);
+                            $this->scores->set($login, $target['PlayerId'], $target['NickName'], Scores::DidNotFinish);
                             $this->playerList->setLives($login, 1);
                         }
                         else
@@ -2824,7 +2854,7 @@ class KnockoutRuntime
         {
             if ($this->scores->get($login) === false)
             {
-                $this->scores->submitScore($login, $player['NickName'], Scores::DidNotFinish);
+                $this->scores->submitScore($login, $player['PlayerId'], $player['NickName'], Scores::DidNotFinish);
             }
         }
         $scores = $this->scores->getSortedScores();
@@ -3232,6 +3262,7 @@ class KnockoutRuntime
         {
             $player = $this->playerList->get($login);
             $this->playerList->setNickname($login, $playerInfo['NickName']);
+            $this->playerList->setPlayerId($login, $playerInfo['PlayerId']);
             $logUnexpectedStatus = function() use($player)
             {
                 Log::warning(sprintf('Player connected with status %s', getNameOfConstant($player['Status'], 'PlayerStatus')));
@@ -3268,7 +3299,7 @@ class KnockoutRuntime
         }
         elseif ($this->isEligibleToJoin())
         {
-            $this->playerList->add($playerInfo['Login'], $playerInfo['NickName'], PlayerStatus::Playing, $this->lives);
+            $this->playerList->add($playerInfo['Login'], $playerInfo['PlayerId'], $playerInfo['NickName'], PlayerStatus::Playing, $this->lives);
             forcePlay($login, true);
             $this->updateKoCount();
             $didJoin = true;
@@ -3277,6 +3308,7 @@ class KnockoutRuntime
         {
             $this->playerList->add(
                 $playerInfo['Login'],
+                $playerInfo['PlayerId'],
                 $playerInfo['NickName'],
                 $joinsAsSpectator ? PlayerStatus::KnockedOutAndSpectating : PlayerStatus::KnockedOut,
                 0
@@ -3468,7 +3500,7 @@ class KnockoutRuntime
                                 break;
                         }
                     }
-                    $this->scores->submitScore($login, $playerObj['NickName'], $timeOrScore);
+                    $this->scores->submitScore($login, $playerObj['PlayerId'], $playerObj['NickName'], $timeOrScore);
                     $this->updateScoreboard();
                 }
                 break;
@@ -5032,7 +5064,7 @@ class KnockoutRuntime
                 if (($this->koStatus === KnockoutStatus::Running && !$this->isPodium)
                     || ($this->koStatus === KnockoutStatus::Tiebreaker && $playerObj['Status'] === PlayerStatus::Playing))
                 {
-                    $this->scores->set($login, $playerObj['NickName'], Scores::DidNotFinish);
+                    $this->scores->set($login, $playerObj['PlayerId'], $playerObj['NickName'], Scores::DidNotFinish);
                 }
                 else
                 {
