@@ -20,17 +20,22 @@ Some XML-RPC methods only work at specific points in a match. Calling them at an
 
 ---
 
-- NextChallenge
 - RestartChallenge/ChallengeRestart
 
-Results in error code -1000 (Change in progress), if proceeding to next round, in Finish and Synchronization. Otherwise, results in error code -1000 in Synchronization (but works in Finish).
+Results in error code -1000 (Change in progress) in Synchronization. Results in error code -1000 (Change in progress) in Finish but only if proceeding to next round on the same map; it works in the podium sequence.
+
+---
+
+- NextChallenge
+
+Results in error code -1000 (Change in progress) during Synchronization and Finish.
 
 ---
 
 - SendDisplayManialinkPage
 - SendDisplayManialinkPageToLogin
 
-May not have an effect with custom_ui when called in onBeginSynchronization (but could be due to TMGery)
+May not have an effect with custom_ui when called in onBeginSynchronization (but could be due to TMGery). Results in error code -1000 if you try to force a spectator target but the player is not in spec. Results in error code -1000 if the target player can not be found.
 
 ---
 
