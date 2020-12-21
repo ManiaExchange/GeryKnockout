@@ -1411,6 +1411,7 @@ class UI
     const Dialog = 440;
     const MultiPageDialog = 450;
     const Prompt = 460;
+    const Message = 470;
 
     private static function statusBarManialink($playerStatus, $knockoutStatus, $roundNumber, $numberOfPlayers, $numberOfKOs)
     {
@@ -1863,11 +1864,11 @@ class UI
         $textboxHeight = $nbLines * 2.5;
         $print = function($value) { return sprintf('%1.1f', $value); };
         $manialink = '
-            <manialink id="' . self::Prompt . '">
+            <manialink id="' . self::Message . '">
                 <format style="TextRaceChat" textsize="1.0" />
-                <frame posn="0 0 1">
-                    <quad posn="0 0 0" sizen="50 ' . $print($textboxHeight + 10.0) . '" halign="center" valign="center" style="Bgs1" substyle="BgWindow3" />
-                    <label posn="0 0.25 1" sizen="50 ' . $print($textboxHeight) . '" halign="center" valign="center" scale="1.4" style="TextStaticSmall">$s' . $text . '</label>
+                <frame posn="0 -2 1">
+                    <quad posn="0 0 0" sizen="56 ' . $print($textboxHeight + 11.5) . '" halign="center" valign="center" style="Bgs1InRace" substyle="BgWindow2" />
+                    <label posn="0 1.0   1" sizen="56 ' . $print($textboxHeight) . '" halign="center" valign="center" scale="1.5" style="TextStaticSmall">$s' . $text . '</label>
                 </frame>
             </manialink>
         ';
@@ -3056,12 +3057,18 @@ class KnockoutRuntime
      */
     private function skipWarmup()
     {
+        // Ensure game mode settings are not changed
+        // $gameInfo = QueryManager::queryWithResponse('GetGameInfos');
+        // $modeSettingsHaveChanged =
+        //     $gameInfo['GameMode']['CurrentValue'] !== $gameInfo['GameMode']['NextValue']
+        //     ||
         switch ($this->gameMode)
         {
             case GameMode::Team:
             case GameMode::Stunts:
             case GameMode::TimeAttack:
-                // Todo: ensure game mode settings are not changed
+                // if ($modeSettingsHaveChanged) QueryManager::query('ForceEndRound');
+                // else QueryManager::query('RestartChallenge');
                 QueryManager::query('RestartChallenge');
                 break;
 
@@ -3071,7 +3078,6 @@ class KnockoutRuntime
 
             case GameMode::Laps:
             case GameMode::Rounds:
-                // Todo: ensure game mode settings are not changed
                 QueryManager::query('RestartChallenge');
                 break;
         }
@@ -3100,9 +3106,6 @@ class KnockoutRuntime
                 break;
 
             case GameMode::Cup:
-                QueryManager::query('RestartChallenge', true);
-                break;
-
             case GameMode::Rounds:
             case GameMode::Team:
                 // Get scores of the current round
@@ -3111,7 +3114,8 @@ class KnockoutRuntime
                 {
                     // If someone have finished, the only way to restart the round is to start from
                     // round 1
-                    QueryManager::query('RestartChallenge');
+                    if ($this->gameMode === GameMode::Cup) QueryManager::query('RestartChallenge', true);
+                    else QueryManager::query('RestartChallenge');
                 }
                 else
                 {
@@ -3554,11 +3558,7 @@ class KnockoutRuntime
                             $this->koStatus = KnockoutStatus::RestartingRound;
                             $this->falseStartCount++;
                             QueryManager::query('ForceEndRound');
-                            $text = sprintf(
-                                'False start! Restarting the round... (%d/%d)',
-                                $this->falseStartCount,
-                                $this->maxFalseStarts
-                            );
+                            $text = "False start! Restarting the round... ({$this->falseStartCount}/{$this->maxFalseStarts})";
                             Chat::info($text);
                             UI::showMessage($text, 5);
                             return;
@@ -4024,17 +4024,14 @@ class KnockoutRuntime
         }
         elseif (!isset($args[1]))
         {
-            if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+            if ($this->koStatus === KnockoutStatus::Tiebreaker)
             {
-                if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                {
-                    $this->scores->reset();
-                }
-                else
-                {
-                    $this->koStatus = KnockoutStatus::RestartingRound;
-                    $this->updateStatusBar();
-                }
+                $this->scores->reset();
+            }
+            elseif ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+            {
+                $this->koStatus = KnockoutStatus::RestartingRound;
+                $this->updateStatusBar();
             }
             $this->restartRound();
             $text = 'Restarting the current round';
@@ -4046,12 +4043,12 @@ class KnockoutRuntime
         }
         elseif (strtolower($args[1]) === 'warmup')
         {
+            if ($this->koStatus === KnockoutStatus::Tiebreaker)
+            {
+                $this->returnFromTiebreaker();
+            }
             if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
             {
-                if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                {
-                    $this->returnFromTiebreaker();
-                }
                 $this->koStatus = KnockoutStatus::RestartingTrack;
                 $this->updateStatusBar();
             }
@@ -5165,16 +5162,18 @@ class KnockoutRuntime
      */
     public function testChatCommand($args, $issuer)
     {
-        if (isadmin($issuer[0]))
+        $login = $issuer[0];
+        if (isadmin($login))
         {
-            QueryManager::query('ForceEndRound');
+            // QueryManager::query('ForceEndRound');
             $text = 'False start! Restarting the round... (1/2)';
-            Chat::info($text);
+            // Chat::info($text);
             UI::showMessage($text, 5);
+            Chat::info2('test done', $login);
         }
         else
         {
-            Chat::error(" UNKNOWN COMMAND !", array($issuer[0]));
+            Chat::error(" UNKNOWN COMMAND !", array($login));
         }
     }
 }
