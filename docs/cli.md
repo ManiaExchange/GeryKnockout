@@ -113,9 +113,6 @@ Shows the list of commands.
 
 ## Public commands
 
-### /info
-Displays information about the knockout.
-
 ### /opt in
 Rejoins the knockout after having opted out. Works only if you're still eligible to join (the live round has not started yet).
 

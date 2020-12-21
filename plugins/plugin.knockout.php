@@ -4936,63 +4936,6 @@ class KnockoutRuntime
     }
 
     /**
-     * Displays a dialog with information about the knockout.
-     *
-     * @param array $args Arguments to the command.
-     * @param array $issuer A single-element array.
-     *
-     *     $issuer = [
-     *         [0] => (string) The login of the player who issued the command.
-     *         [1] => (string) The nickname of the player who issued the command.
-     *     ]
-     */
-    public function infoChatCommand($args, $issuer)
-    {
-        $login = $issuer[0];
-        $text = implode("\n\n", array(
-            '$oAbout the TM$f00X$g Knockout United$o',
-
-            implode("\n", array(
-                'The TMX Knockout United is a weekly knockout event designed to be fun! It provides casual gameplay',
-                'and an element of unpredictable results. No training of tracks is required - just join the server in time and',
-                'play.'
-            )),
-
-            implode("\n", array(
-                'The event is held every Friday at 22:00 CET/CEST. We usually play KO9 (Stunts) the first Friday of the',
-                'month and other track groups the other weeks.'
-            )),
-
-            implode("\n", array(
-                'When the knockout starts, everyone is put to play. If the HUD is enabled, a status bar is shown at the top',
-                '(click on the TMGery button on the top left to enable/disable). We usually play Rounds with one',
-                'warmup and one live round for each track. At the end of each round, the last placed driver, or all those',
-                'who do not finish the race, are knocked out until one player remains as the winner.'
-            )),
-
-            implode("\n", array(
-                "If you experience a disconnection, you may get reinstated only if you haven't been knocked out yet and,",
-                'without missing any rounds,',
-                '    - rejoin during the warmup (Rounds, Laps)',
-                '    - rejoin with time to spare (Time Attack, Stunts)'
-            )),
-
-            implode("\n", array(
-                'If you do get knocked out, don\'t fret! You can still play during warmups, and there are multiple knockouts',
-                'to be played; you can participate again if you wait for the next knockout.'
-            )),
-
-            'The most important part is: never give up! Someone may have retired :)',
-
-            implode("\n", array(
-                '$4af$l[http://bit.ly/TMXSpreadsheet]Results and map list$l',
-                '$l[http://discordapp.com/invite/Ttkw54Y]TMX Discord$l'
-            )),
-        ));
-        UI::showInfoDialog(Text::info(" \n$text"), $login);
-    }
-
-    /**
      * Command to opt out if someone does not want to participate in a knockout.
      *
      * This function is called when a user sends a chat message starting with '/opt'.
@@ -5232,7 +5175,6 @@ $this->AddEvent('StatusChanged', 'onStatusChange');
 $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
 
 $this->addChatCommand('ko', true, 'adminChatCommands');
-$this->addChatCommand('info', true, 'infoChatCommand');
 $this->addChatCommand('opt', true, 'optChatCommand');
 $this->addChatCommand('test', false, 'testChatCommand');
 

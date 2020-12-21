@@ -245,7 +245,6 @@ New admin commands:
 
 New public commands:
 
-- /info
 - /opt in
 - /opt out
 
