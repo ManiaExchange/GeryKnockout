@@ -567,7 +567,7 @@ class Text
     }
 
     /**
-     * Removes all formatting in a string.
+     * Removes all formatting in a string, leaving formatting tags out.
      *
      * @param string $text The text to remove formatting from.
      *
@@ -576,6 +576,18 @@ class Text
     public static function clean($text)
     {
         return self::findAndReplaceCallback($text, function() { return ''; });
+    }
+
+    /**
+     * Sanitizes a string such that formatting tags are explicitly shown (e.g. `$g` -> `$$g`).
+     *
+     * @param string $text The text to remove formatting from.
+     *
+     * @return string The unformatted equivalent of the input text.
+     */
+    public static function sanitize($text)
+    {
+        return self::findAndReplaceCallback($text, function($tag) { return "\$$tag"; });
     }
 
     /**
@@ -3873,7 +3885,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko start$x or $x/ko start now$x)', $args[1]));
+            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko start$x or $x/ko start now$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -3951,7 +3963,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Unexpected argument $x%s$x (expected $x/ko skip$x or $x/ko skip warmup$x)', $args[1]));
+            $onError(sprintf('Unexpected argument $x%s$x (expected $x/ko skip$x or $x/ko skip warmup$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -4004,7 +4016,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko restart$x or $x/ko restart warmup$x)', $args[1]));
+            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko restart$x or $x/ko restart warmup$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -4041,7 +4053,7 @@ class KnockoutRuntime
             }
             else
             {
-                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                $onError(sprintf('Error: login $x%s$x could not be found', Text::sanitize($args[1])));
                 return;
             }
 
@@ -4057,7 +4069,7 @@ class KnockoutRuntime
                 }
                 else
                 {
-                    $onError(sprintf('$x%s$x is already playing', $args[1]));
+                    $onError(sprintf('$x%s$x is already playing', Text::sanitize($args[1])));
                 }
             }
             else
@@ -4110,7 +4122,7 @@ class KnockoutRuntime
             }
             else
             {
-                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                $onError(sprintf('Error: login $x%s$x could not be found', Text::sanitize($args[1])));
                 return;
             }
 
@@ -4128,7 +4140,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('$x%s$x is already knocked out', $args[1]));
+                        $onError(sprintf('$x%s$x is already knocked out', Text::sanitize($args[1])));
                     }
                 }
                 else
@@ -4165,7 +4177,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('$x%s$x is already spectating', $args[1]));
+                        $onError(sprintf('$x%s$x is already spectating', Text::sanitize($args[1])));
                     }
                 }
                 else
@@ -4218,7 +4230,7 @@ class KnockoutRuntime
             }
             else
             {
-                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                $onError(sprintf('Error: login $x%s$x could not be found', Text::sanitize($args[1])));
                 return;
             }
 
@@ -4240,7 +4252,7 @@ class KnockoutRuntime
             }
             elseif (!is_numeric($args[2]))
             {
-                $onError(sprintf('Error: argument $x%s$x is not a number', $args[2]));
+                $onError(sprintf('Error: argument $x%s$x is not a number', Text::sanitize($args[2])));
             }
             elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
             {
@@ -4341,7 +4353,7 @@ class KnockoutRuntime
                     }
                     elseif (!is_numeric($args[2]))
                     {
-                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi constant <x KOs per round>$x)', $args[1]));
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi constant <x KOs per round>$x)', Text::sanitize($args[2])));
                     }
                     elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                     {
@@ -4374,7 +4386,7 @@ class KnockoutRuntime
                     }
                     elseif (!is_numeric($args[2]))
                     {
-                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi extra <per x players>$x)', $args[1]));
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi extra <per x players>$x)', Text::sanitize($args[2])));
                     }
                     elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                     {
@@ -4407,7 +4419,7 @@ class KnockoutRuntime
                     }
                     elseif (!is_numeric($args[2]))
                     {
-                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi dynamic <x rounds>$x)', $args[1]));
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi dynamic <x rounds>$x)', Text::sanitize($args[2])));
                     }
                     elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                     {
@@ -4432,7 +4444,7 @@ class KnockoutRuntime
                 default:
                     if (isset($args[1]))
                     {
-                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $xconstant$x, $xextra$x or $xnone$x)', $args[1]));
+                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $xconstant$x, $xextra$x or $xnone$x)', Text::sanitize($args[1])));
                     }
                     else
                     {
@@ -4473,7 +4485,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
+            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -4495,11 +4507,11 @@ class KnockoutRuntime
         }
         elseif (!is_numeric($args[1]))
         {
-            $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
+            $onError(sprintf('Error: argument $x%s$x is not a number', Text::sanitize($args[1])));
         }
         elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
         {
-            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[1]));
         }
         else
         {
@@ -4548,7 +4560,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
+            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -4570,11 +4582,11 @@ class KnockoutRuntime
         }
         elseif (!is_numeric($args[1]))
         {
-            $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
+            $onError(sprintf('Error: argument $x%s$x is not a number', Text::sanitize($args[1])));
         }
         elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
         {
-            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[1]));
         }
         else
         {
@@ -4781,7 +4793,7 @@ class KnockoutRuntime
                     break;
 
                 default:
-                    $onError(sprintf('Syntax error: unexpected argument $x%s$x (see $x/ko help$x for usages)', $args[0]));
+                    $onError(sprintf('Syntax error: unexpected argument $x%s$x (see $x/ko help$x for usages)', Text::sanitize($args[0])));
                     break;
             }
         }
@@ -5018,7 +5030,7 @@ class KnockoutRuntime
         }
         else
         {
-            $msg = sprintf('Syntax error: unexpected argument $x%s$x (expected $x/opt out$x)', $args[0]);
+            $msg = sprintf('Syntax error: unexpected argument $x%s$x (expected $x/opt out$x)', Text::sanitize($args[0]));
             Chat::error($msg, $issuerLogin);
         }
     }
