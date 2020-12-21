@@ -616,6 +616,7 @@ class Text
 
     private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
     {
+        // Returns from a highlight to the original base color if needed
         $highlight_inv = self::findAndReplace(self::invert($highlight), '$g', $baseColor);
         $callback = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight, $highlight_inv)
         {
@@ -631,9 +632,7 @@ class Text
                     return $tag;
             }
         };
-        Log::debug(sprintf('before: %s', $text));
         $formatted = self::findAndReplaceCallback($text, $callback);
-        Log::debug(sprintf('after: %s', $formatted));
         if ($startWithBaseStyle) return "{$baseStyle}{$baseColor}{$formatted}";
         else return "{$baseColor}{$formatted}";
     }
@@ -1552,16 +1551,17 @@ class UI
         {
             switch (strlen($position))
             {
-                case 1: return 1.5;
-                case 2: return 2.4;
-                case 3: return 3.3;
-                default: return 4.2;
+                case 0: return 0.6;
+                case 1: return 1.5;    // 1.
+                case 2: return 2.4;    // 10.
+                case 3: return 3.3;    // 100.
+                default: return 4.2;   // 1000. +
             }
         };
         $scoreWidth = function($score)
         {
             $length = strlen($score);
-            if ($length >= 10) return 8.3;      // 1:00:00.00
+            if ($length >= 10) return 8.3;      // 1:00:00.00 +
             elseif ($length >= 8) return 7.0;   //   10:00.00
             elseif ($length >= 7) return 6.0;   //    1:00.00
             else return 4.3;                    //        DNF
@@ -1760,7 +1760,6 @@ class UI
      */
     public static function showInfoDialog($text, $logins)
     {
-        if (is_string($logins)) $logins = array($logins);
         $manialink = '
             <manialink id="' . self::Dialog . '">
                 <format style="TextRaceChat" textsize="1.0" />
@@ -1771,6 +1770,7 @@ class UI
                 </frame>
             </manialink>
         ';
+        if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
         QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
     }
@@ -1790,7 +1790,6 @@ class UI
      */
     public static function showMultiPageDialog($text, $logins, $currentPageNumber, $totalPages, $prevPageActionId = null, $nextPageActionId = null)
     {
-        if (is_string($logins)) $logins = array($logins);
         $prevPage = is_null($prevPageActionId)
             ? '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="StarGold" />'
             : '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="ArrowPrev" action="' . $prevPageActionId . '" />';
@@ -1813,6 +1812,7 @@ class UI
                 </frame>
             </manialink>
         ';
+        if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
         QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
     }
@@ -1828,7 +1828,6 @@ class UI
      */
     public static function showPrompt($text, $actionId, $logins)
     {
-        if (is_string($logins)) $logins = array($logins);
         $nbLines = substr_count($text, "\n") + 1;
         $textboxHeight = $nbLines * 2.5;
         $print = function($value) { return sprintf('%1.1f', $value); };
@@ -1843,8 +1842,45 @@ class UI
                 </frame>
             </manialink>
         ';
+        if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
         QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
+    }
+
+    /**
+     * Shows a small, scalable message with larger text and no buttons.
+     *
+     * @param string $text The text to display. Must be manually broken into lines, otherwise, the
+     * text will become crammed.
+     * @param int $duration A timeout (in seconds) to hide the message. Set to 0 to show
+     * permanently.
+     * @param string|array $logins [Optional] The login or logins to display the prompt for. If
+     * null, the message is shown for all players on the server.
+     */
+    public static function showMessage($text, $timeout, $logins = null)
+    {
+        $nbLines = substr_count($text, "\n") + 1;
+        $textboxHeight = $nbLines * 2.5;
+        $print = function($value) { return sprintf('%1.1f', $value); };
+        $manialink = '
+            <manialink id="' . self::Prompt . '">
+                <format style="TextRaceChat" textsize="1.0" />
+                <frame posn="0 0 1">
+                    <quad posn="0 0 0" sizen="50 ' . $print($textboxHeight + 10.0) . '" halign="center" valign="center" style="Bgs1" substyle="BgWindow3" />
+                    <label posn="0 0.25 1" sizen="50 ' . $print($textboxHeight) . '" halign="center" valign="center" scale="1.4" style="TextStaticSmall">$s' . $text . '</label>
+                </frame>
+            </manialink>
+        ';
+        if (is_null($logins))
+        {
+            QueryManager::query('SendDisplayManialinkPage', $manialink, $timeout * 1000, true);
+        }
+        else
+        {
+            if (is_string($logins)) $logins = array($logins);
+            $commaSeparatedLogins = implode(',', $logins);
+            QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, $timeout * 1000, true);
+        }
     }
 }
 
@@ -2110,7 +2146,6 @@ class KOMultiplier
     {
         $this->mode = self::None;
         $this->value = null;
-        $this->projection = array();
     }
 
     public function revert()
@@ -3504,6 +3539,8 @@ class KnockoutRuntime
                 // Check if it's the first player to retire and whether a false start
                 // can be considered
                 if ($this->shouldCheckForFalseStarts
+                    && $this->gameMode !== GameMode::Stunts
+                    && $this->gameMode !== GameMode::TimeAttack
                     && $timeOrScore === 0
                     && $this->falseStartCount < $this->maxFalseStarts)
                 {
@@ -3517,11 +3554,13 @@ class KnockoutRuntime
                             $this->koStatus = KnockoutStatus::RestartingRound;
                             $this->falseStartCount++;
                             QueryManager::query('ForceEndRound');
-                            Chat::info(sprintf(
+                            $text = sprintf(
                                 'False start! Restarting the round... (%d/%d)',
                                 $this->falseStartCount,
                                 $this->maxFalseStarts
-                            ));
+                            );
+                            Chat::info($text);
+                            UI::showMessage($text, 5);
                             return;
                         }
                     }
@@ -3998,7 +4037,12 @@ class KnockoutRuntime
                 }
             }
             $this->restartRound();
-            Chat::info('Restarting the current round');
+            $text = 'Restarting the current round';
+            Chat::info($text);
+            if ($this->gameMode === GameMode::Rounds || $this->gameMode === GameMode::Team)
+            {
+                UI::showMessage($text, 5);
+            }
         }
         elseif (strtolower($args[1]) === 'warmup')
         {
@@ -5123,45 +5167,10 @@ class KnockoutRuntime
     {
         if (isadmin($issuer[0]))
         {
-            // $player1 = array(
-            //     'Login' => 'player1',
-            //     'PlayerId' => '1',
-            //     'NickName' => 'Dummo|Player 1|teamOne',
-            //     'Score' => 120000
-            // );
-            // $player2 = array(
-            //     'Login' => 'player2',
-            //     'PlayerId' => '2',
-            //     'NickName' => 'Dummo|Player 2|teamOne',
-            //     'Score' => (120000 * 10)
-            // );
-            // $player3 = array(
-            //     'Login' => 'player3',
-            //     'PlayerId' => '3',
-            //     'NickName' => 'Dummo|Player 3|teamOne',
-            //     'Score' => (120000 * 60)
-            // );
-            // $player4 = array(
-            //     'Login' => 'player4',
-            //     'PlayerId' => '4',
-            //     'NickName' => 'Dummo|Player 4|teamOne',
-            //     'Score' => Scores::DidNotFinish
-            // );
-            // $empty = array(
-            //     'Login' => 'none',
-            //     'PlayerId' => '5',
-            //     'NickName' => 'None',
-            //     'Score' => Scores::DidNotFinish
-            // );
-            // UI::updateScoreboard(
-            //     array($player1, $player2, $player3, $player4, $empty, $empty, $empty, $empty, $empty, $empty),
-            //     GameMode::Rounds,
-            //     1,
-            //     10,
-            //     $issuer[0]
-            // );
-            // Chat::info2('test done', array($issuer[0]));
-            Chat::info2(Text::clean(implode(' ', $args)), $issuer[0]);
+            QueryManager::query('ForceEndRound');
+            $text = 'False start! Restarting the round... (1/2)';
+            Chat::info($text);
+            UI::showMessage($text, 5);
         }
         else
         {
