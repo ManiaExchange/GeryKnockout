@@ -1359,7 +1359,7 @@ class PlayerList
     }
 
     /**
-     * Returns the players who are in the KO.
+     * Returns the players who are in the knockout.
      */
     public function getPlaying()
     {
@@ -1370,7 +1370,7 @@ class PlayerList
     }
 
     /**
-     * Returns the players who are in the KO.
+     * Returns the players who are in the knockout.
      */
     public function getPlayingOrShelved()
     {
@@ -1381,7 +1381,7 @@ class PlayerList
     }
 
     /**
-     * Returns the number of players who are in the KO.
+     * Returns the number of players who are in the knockout.
      */
     public function countPlaying()
     {
@@ -1893,7 +1893,7 @@ class KOMultiplier
      * Gets the number of KOs to perform in this round.
      *
      * @param int $roundNumber The current round number.
-     * @param int $numberOfPlayersLeft The number of players left in the KO.
+     * @param int $numberOfPlayersLeft The number of players left in the knockout.
      *
      * @return int The number of KOs to be applied this round.
      */
@@ -2553,8 +2553,8 @@ class KnockoutRuntime
     /**
      * Starts the knockout.
      *
-     * @param array $players  Players to start with (result of GetPlayerList query)
-     * @param bool $now       True to skip the current track and start the KO immediately.
+     * @param array $players Players to start with (result of GetPlayerList query)
+     * @param bool $now True to skip the current track and start the knockout immediately.
      */
     private function start($players, $now = false)
     {
@@ -2908,7 +2908,7 @@ class KnockoutRuntime
     }
 
     /**
-     * Skips the upcoming map(s) until the author is not present in the KO.
+     * Skips the upcoming map(s) until the author is not present in the knockout.
      */
     private function replaceNextTrackIfNeeded()
     {
@@ -3500,7 +3500,7 @@ class KnockoutRuntime
                     $currentTime = microtime(true);
                     if ($currentTime - $this->roundStartTime <= 1.)
                     {
-                        // Must be a player in the KO who retires
+                        // Must be a player in the knockout who retires
                         if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
                         {
                             $this->koStatus = KnockoutStatus::RestartingRound;
@@ -4066,11 +4066,11 @@ class KnockoutRuntime
                 $this->add($playersToAdd);
                 if ($args[1] === '*')
                 {
-                    Chat::info('All players have been added to the KO');
+                    Chat::info('All players have been added to the knockout');
                 }
                 else
                 {
-                    Chat::info(sprintf('$x%s$z has been added to the KO', $playersToAdd[0]['NickName']));
+                    Chat::info(sprintf('$x%s$z has been added to the knockout', $playersToAdd[0]['NickName']));
                 }
             }
         }
@@ -4137,7 +4137,7 @@ class KnockoutRuntime
                     $this->remove($playersToRemove, PlayerStatus::KnockedOut);
                     if ($args[1] === '*')
                     {
-                        Chat::info('All players have been removed from the KO');
+                        Chat::info('All players have been removed from the knockout');
                     }
                     else
                     {
@@ -4936,7 +4936,7 @@ class KnockoutRuntime
     }
 
     /**
-     * Displays a dialog with information about the KO.
+     * Displays a dialog with information about the knockout.
      *
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
@@ -4993,7 +4993,9 @@ class KnockoutRuntime
     }
 
     /**
-     * Invoked when a player does not want to participate in the KO.
+     * Command to opt out if someone does not want to participate in a knockout.
+     *
+     * This function is called when a user sends a chat message starting with '/opt'.
      *
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
