@@ -320,7 +320,7 @@ class Log
 class Actions
 {
     const ToggleHUD = 98;
-    const Cancel = 99;
+    const Dismiss = 99;
     const ConfirmOptOut = 501;
     const CliReferencePage1 = 511;
     const CliReferencePage2 = 512;
@@ -1755,7 +1755,7 @@ class UI
                 <frame posn="-40 43 1">
                     <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
                     <label posn="0 0 1" sizen="80 3" halign="left" style="TextStaticSmall">' . $text . '</label>
-                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="99">Ok</label>
+                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="' . Actions::Dismiss . '">Ok</label>
                 </frame>
             </manialink>
         ';
@@ -1791,7 +1791,7 @@ class UI
                 <frame posn="-40 43 1">
                     <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
                     <label posn="0 0 1" sizen="80 3" halign="left" style="TextStaticSmall">' . $text . '</label>
-                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="99">Ok</label>
+                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="' . Actions::Dismiss . '">Ok</label>
                     <frame posn="72 -73 1">
                         <quad posn="0 0 0" sizen="14 4" halign="center" valign="center" style="Bgs1" substyle="BgButton" />
                         <label posn="-5 0.1 1" sizen="6 4" halign="left" valign="center">$o$444' . $currentPageNumber . '/' . $totalPages . '</label>
@@ -1825,10 +1825,9 @@ class UI
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="0 0 1">
                     <quad posn="0 0 0" sizen="64.8 ' . $print($textboxHeight + 12.0) . '" halign="center" valign="center" style="Bgs1" substyle="BgWindow3" />
-                    <!-- <quad posn="-30.5 ' . $print(0.5 * $textboxHeight + 3.0) . ' 0.5" sizen="61 ' . $print($textboxHeight) . '" halign="left" valign="top" bgcolor="8888" /> -->
                     <label posn="0 ' . $print(0.5 * $textboxHeight + 3.0) . ' 1" sizen="61 ' . $print($textboxHeight) . '" halign="center" valign="top" style="TextStaticSmall">' . $text . '</label>
                     <label posn="-14.9 ' . $print(-0.5 * $textboxHeight - 1.0) . ' 1" halign="center" valign="center" style="CardButtonMedium" action="' . $actionId . '">Yes</label>
-                    <label posn="14.9 ' . $print(-0.5 * $textboxHeight - 1.0) . ' 1" halign="center" valign="center" style="CardButtonMedium" action="99">No</label>
+                    <label posn="14.9 ' . $print(-0.5 * $textboxHeight - 1.0) . ' 1" halign="center" valign="center" style="CardButtonMedium" action="' . Actions::Dismiss . '">No</label>
                 </frame>
             </manialink>
         ';
