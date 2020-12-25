@@ -3057,28 +3057,30 @@ class KnockoutRuntime
      */
     private function skipWarmup()
     {
-        // Ensure game mode settings are not changed
-        // $gameInfo = QueryManager::queryWithResponse('GetGameInfos');
-        // $modeSettingsHaveChanged =
-        //     $gameInfo['GameMode']['CurrentValue'] !== $gameInfo['GameMode']['NextValue']
-        //     ||
         switch ($this->gameMode)
         {
-            case GameMode::Team:
             case GameMode::Stunts:
             case GameMode::TimeAttack:
-                // if ($modeSettingsHaveChanged) QueryManager::query('ForceEndRound');
-                // else QueryManager::query('RestartChallenge');
+                // If game mode settings have been changed, RestartChallenge restarts the challenge
+                // with warmups
+                $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
+                QueryManager::query('SetAllWarmUpDuration', 0);
                 QueryManager::query('RestartChallenge');
+                QueryManager::query('SetAllWarmUpDuration', $warmup['NextValue']);
                 break;
 
             case GameMode::Cup:
-                QueryManager::query('RestartChallenge', true);
-                break;
-
             case GameMode::Laps:
             case GameMode::Rounds:
-                QueryManager::query('RestartChallenge');
+            case GameMode::Team:
+                // Ensure game mode settings have not changed
+                $gameInfo = QueryManager::queryWithResponse('GetGameInfos');
+                $modeSettingsHaveChanged =
+                    $gameInfo['CurrentGameInfos']['GameMode'] !== $gameInfo['NextGameInfos']['GameMode']
+                    || $gameInfo['CurrentGameInfos']['NbChallenge'] !== $gameInfo['NextGameInfos']['NbChallenge'];
+                if ($modeSettingsHaveChanged) QueryManager::query('ForceEndRound');
+                elseif ($this->gameMode === GameMode::Cup) QueryManager::query('RestartChallenge', true);
+                else QueryManager::query('RestartChallenge');
                 break;
         }
     }
@@ -3099,21 +3101,22 @@ class KnockoutRuntime
         //   - If someone have finished: completes the round and starts the next one
         switch ($this->gameMode)
         {
-            case GameMode::Laps:
             case GameMode::Stunts:
             case GameMode::TimeAttack:
+                // No way to restart without warmup if settings have changed
                 QueryManager::query('RestartChallenge');
                 break;
 
             case GameMode::Cup:
+            case GameMode::Laps:
             case GameMode::Rounds:
             case GameMode::Team:
                 // Get scores of the current round
                 $scores = $this->scores->getSortedScores();
                 if (isset($scores[0]) && $scores[0]['Score'] > 0)
                 {
-                    // If someone have finished, the only way to restart the round is to start from
-                    // round 1
+                    // If someone have finished, the only way to restart the round (without points
+                    // being applied) is to start from round 1
                     if ($this->gameMode === GameMode::Cup) QueryManager::query('RestartChallenge', true);
                     else QueryManager::query('RestartChallenge');
                 }
@@ -5165,10 +5168,8 @@ class KnockoutRuntime
         $login = $issuer[0];
         if (isadmin($login))
         {
-            // QueryManager::query('ForceEndRound');
-            $text = 'False start! Restarting the round... (1/2)';
-            // Chat::info($text);
-            UI::showMessage($text, 5);
+            if ($args[0]) QueryManager::query('SetWarmUp', true);
+            else QueryManager::query('SetWarmUp', false);
             Chat::info2('test done', $login);
         }
         else
