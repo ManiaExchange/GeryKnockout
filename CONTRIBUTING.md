@@ -11,10 +11,11 @@ You may find some of these resources useful when working on this project:
 onStatusChange and respective callbacks are called in varying order:
 
 - onStatusChange (Launching) -> onBeginRace
-- onStatusChange (Synchronization) ->
+- onStatusChange (Synchronization) -> <nothing>
 - onBeginRound -> onStatusChange (Play)
-- onEndRound ->
 - onEndRace -> onStatusChange (Finish)
+
+I've added a "callback" function `onBeginSynchronization` which fills the gap here.
 
 Some XML-RPC methods only work at specific points in a match. Calling them at an unsuitable time may yield no result or an error from the client. Some of these cases are listed below:
 
@@ -33,9 +34,17 @@ Results in error code -1000 (Change in progress) during Synchronization and Fini
 ---
 
 - SendDisplayManialinkPage
+- SendDisplayManialinkPageToId
 - SendDisplayManialinkPageToLogin
 
-May not have an effect with custom_ui when called in onBeginSynchronization (but could be due to TMGery). Results in error code -1000 if you try to force a spectator target but the player is not in spec. Results in error code -1000 if the target player can not be found.
+May not have an effect with custom_ui when called in onBeginSynchronization (but could be due to TMGery). Results in error code -1000 if the target player can not be found.
+
+---
+
+- ForceSpectatorTarget
+- ForceSpectatorTargetId
+
+Results in error code -1000 if you try to force a spectator target but the player is not in spec.
 
 ---
 
@@ -43,6 +52,12 @@ May not have an effect with custom_ui when called in onBeginSynchronization (but
 - SetRoundPointsLimit
 
 Has to be set before onStatusChange (Synchronization) in order to have effect on the upcoming round.
+
+---
+
+- ForceEndRound
+
+Works in Cup, Laps, Rounds and Team but not in Stunts and Time Attack (contrary to XML-RPC documentation).
 
 ## Debugging
 The following places are useful to look at for information regarding a bug or crash:
