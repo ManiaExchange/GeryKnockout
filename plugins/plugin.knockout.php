@@ -4152,7 +4152,7 @@ class KnockoutRuntime
      * - `/ko remove (<login> | *)`
      * - `/ko spec (<login> | *)`
      */
-    private function cliRemove($args, $onError)
+    private function cliRemove($args, $onError, $issuerLogin)
     {
         if ($this->koStatus === KnockoutStatus::Idle)
         {
@@ -4216,6 +4216,10 @@ class KnockoutRuntime
                         else
                         {
                             Chat::info(sprintf('$x%s$z has been removed from the knockout', $playersToRemove[0]['NickName']));
+                            if ($this->isLive())
+                            {
+                                Chat::info2('Note: the player is DNF and will be knocked out once the round has completed', $issuerLogin);
+                            }
                         }
                     }
                 }
@@ -4247,6 +4251,10 @@ class KnockoutRuntime
                     else
                     {
                         Chat::info(sprintf('$x%s$z has been put to spec', $playersToRemove[0]['NickName']));
+                        if ($this->isLive())
+                        {
+                            Chat::info2('Note: the player is DNF and will be knocked out once the round has completed', $issuerLogin);
+                        }
                     }
                 }
             }
@@ -4810,7 +4818,7 @@ class KnockoutRuntime
 
                 case 'remove':
                 case 'spec':
-                    $this->cliRemove($args, $onError);
+                    $this->cliRemove($args, $onError, $issuerLogin);
                     break;
 
                 case 'lives':
