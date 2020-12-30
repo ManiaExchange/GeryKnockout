@@ -2694,6 +2694,17 @@ class KnockoutRuntime
         $this->onKoStatusUpdate();
     }
 
+    /**
+     * Returns true if there is a live round ongoing. Will return false if it's currently a warmup,
+     * a podium or the knockout is not running.
+     */
+    private function isLive()
+    {
+        return ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
+            && !$this->isWarmup
+            && !$this->isPodium;
+    }
+
     private function remove($playersToRemove, $status)
     {
         foreach ($playersToRemove as $player)
@@ -2711,11 +2722,9 @@ class KnockoutRuntime
                 switch ($target['Status'])
                 {
                     case PlayerStatus::Playing:
-                        $shouldDNF =
-                            ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
-                            && PlayerStatus::isIn($target['Status']);
-                        if ($shouldDNF)
+                        if ($this->isLive())
                         {
+                            // Perform a DNF instead of abruptly removing the player, so there's no additional KOs
                             $this->scores->set($login, $target['PlayerId'], $target['NickName'], Scores::DidNotFinish);
                             $this->playerList->setLives($login, 1);
                         }
