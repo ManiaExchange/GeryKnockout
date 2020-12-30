@@ -3422,10 +3422,9 @@ class KnockoutRuntime
 
         if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
         {
-            $this->updateStatusBar($login);
-            $this->announceRoundInChat($login);
             if ($didJoin)
             {
+                $this->updateStatusBar();
                 if (!$this->isWarmup && !$this->isPodium && $this->roundNumber === 1)
                 {
                     Chat::info('The knockout has started! Gogogo', $login);
@@ -3435,14 +3434,19 @@ class KnockoutRuntime
                     Chat::info('The knockout is about to start! Gogogo', $login);
                 }
             }
-            elseif ($didRejoin)
-            {
-                Chat::info('You rejoined in time! Gogogo', $login);
-            }
             else
             {
-                Chat::info('You have entered a match in progress', $login);
+                $this->updateStatusBar($login);
+                if ($didRejoin)
+                {
+                    Chat::info('You rejoined in time! Gogogo', $login);
+                }
+                else
+                {
+                    Chat::info('You have entered a match in progress', $login);
+                }
             }
+            $this->announceRoundInChat($login);
         }
     }
 
