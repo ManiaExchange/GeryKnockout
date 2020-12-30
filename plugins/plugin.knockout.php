@@ -3063,35 +3063,12 @@ class KnockoutRuntime
 
     /**
      * Skips the warmup phase. Assumes there is a warmup currently running.
+     *
+     * If the game mode has changed, it will take effect as this function is called.
      */
     private function skipWarmup()
     {
-        switch ($this->gameMode)
-        {
-            case GameMode::Stunts:
-            case GameMode::TimeAttack:
-                // If game mode settings have been changed, RestartChallenge restarts the challenge
-                // with warmups
-                $warmup = QueryManager::queryWithResponse('GetAllWarmUpDuration');
-                QueryManager::query('SetAllWarmUpDuration', 0);
-                QueryManager::query('RestartChallenge');
-                QueryManager::query('SetAllWarmUpDuration', $warmup['NextValue']);
-                break;
-
-            case GameMode::Cup:
-            case GameMode::Laps:
-            case GameMode::Rounds:
-            case GameMode::Team:
-                // Ensure game mode settings have not changed
-                $gameInfo = QueryManager::queryWithResponse('GetGameInfos');
-                $modeSettingsHaveChanged =
-                    $gameInfo['CurrentGameInfos']['GameMode'] !== $gameInfo['NextGameInfos']['GameMode']
-                    || $gameInfo['CurrentGameInfos']['NbChallenge'] !== $gameInfo['NextGameInfos']['NbChallenge'];
-                if ($modeSettingsHaveChanged) QueryManager::query('ForceEndRound');
-                elseif ($this->gameMode === GameMode::Cup) QueryManager::query('RestartChallenge', true);
-                else QueryManager::query('RestartChallenge');
-                break;
-        }
+        QueryManager::query('SetWarmUp', false);
     }
 
     /**
