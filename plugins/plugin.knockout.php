@@ -1962,7 +1962,7 @@ class KOMultiplier
                 case self::Extra:
                     return (int) ceil($numberOfPlayersLeft / $this->value);
                 case self::Dynamic:
-                    $func = $this->solveCurve($this->baseCurve(), $roundNumber, $this->value, $numberOfPlayersLeft, 1);
+                    $func = $this->solveCurve($this->baseCurve(), $roundNumber, $this->value + 1, $numberOfPlayersLeft, 1);
                     return $func($roundNumber);
                 case self::Tiebreaker:
                     return $this->value;
