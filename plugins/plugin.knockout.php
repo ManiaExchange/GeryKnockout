@@ -4303,7 +4303,7 @@ class KnockoutRuntime
             else
             {
                 $sign = substr($args[2], 0, 1);
-                $value = abs((int) $args[2]);
+                $value = (int) $args[2];
                 $livesStr = pluralize($value, 'life', 'lives');
                 if ($value === 0)
                 {
