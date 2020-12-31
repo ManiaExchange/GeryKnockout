@@ -4304,7 +4304,7 @@ class KnockoutRuntime
             {
                 $sign = substr($args[2], 0, 1);
                 $value = (int) $args[2];
-                $livesStr = pluralize($value, 'life', 'lives');
+                $livesStr = pluralize(abs($value), 'life', 'lives');
                 if ($value === 0)
                 {
                     $onError(sprintf('Error: argument $x%d$x must be a non-zero value', $value));
@@ -4323,7 +4323,7 @@ class KnockoutRuntime
                         else
                         {
                             $actionStr = $sign === '+' ? 'increased' : 'decreased';
-                            Chat::info(sprintf('Lives per player has been %s by %d (is now %d)', $actionStr, $value, $this->lives));
+                            Chat::info(sprintf('Lives per player has been %s by %d (is now %d)', $actionStr, abs($value), $this->lives));
                         }
                     }
                     else
