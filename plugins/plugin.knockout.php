@@ -1047,6 +1047,33 @@ class Scores
     }
 
     /**
+     * Removes the score (if set) of the given player. The player will not be appearing in
+     * scoreboards.
+     *
+     * @param string $login The login of the player.
+     *
+     * @return bool True if the player was found and their score was removed.
+     */
+    public function remove($login)
+    {
+        $logins = array_map(
+            function($player) { return $player['Login']; },
+            $this->scores
+        );
+        $index = array_search($login, $logins, true);
+        if ($index === false)
+        {
+            return false;
+        }
+        else
+        {
+            unset($this->scores[$index]);
+            $this->scores = array_values($this->scores);
+            return true;
+        }
+    }
+
+    /**
      * Explicitly sets a score that might be lower than the current score. Note that this should
      * only be used for administrative operations as it is less performant than submitScore.
      *
@@ -2722,18 +2749,8 @@ class KnockoutRuntime
                 switch ($target['Status'])
                 {
                     case PlayerStatus::Playing:
-                        if ($this->isLive())
-                        {
-                            // Perform a DNF instead of abruptly removing the player, so there's no additional KOs
-                            $this->scores->set($login, $target['PlayerId'], $target['NickName'], Scores::DidNotFinish);
-                            $this->playerList->setLives($login, 1);
-                        }
-                        else
-                        {
-                            $this->playerList->setStatus($login, $status);
-                            $this->playerList->setLives($login, 0);
-                        }
-                        break;
+                        if ($this->isLive()) $this->scores->remove($login);
+                        // Flow into next case
                     case PlayerStatus::Shelved:
                         $this->playerList->setStatus($login, $status);
                         $this->playerList->setLives($login, 0);
@@ -2782,17 +2799,15 @@ class KnockoutRuntime
             if ($remainingLives <= 0)
             {
                 // Knocked out
+                $this->playerList->setStatus($login, PlayerStatus::KnockedOut);
                 if ($this->openWarmup && $this->isWarmup)
                 {
                     $toPlay[] = $login;
-                    $this->playerList->setStatus($login, PlayerStatus::KnockedOut);
-                    $this->playerList->setLives($login, 0);
                 }
                 else
                 {
                     $toSpec[] = $login;
-                    // Perform a DNF instead of abruptly removing the player, so there's no additional KOs
-                    $this->scores->set($login, $player['PlayerId'], $player['NickName'], Scores::DidNotFinish);
+                    $this->scores->remove($login);
                 }
             }
             elseif ($player['Lives'] <= 0)
