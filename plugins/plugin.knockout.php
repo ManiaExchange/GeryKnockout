@@ -2776,26 +2776,31 @@ class KnockoutRuntime
         $toSpec = array();
         foreach ($playersToUpdate as $player)
         {
+            $login = $player['Login'];
             $remainingLives = $player['Lives'] + $lives;
-            $this->playerList->setLives($player['Login'], max(0, $remainingLives));
+            $this->playerList->setLives($login, max(0, $remainingLives));
             if ($remainingLives <= 0)
             {
                 // Knocked out
                 if ($this->openWarmup && $this->isWarmup)
                 {
-                    $toPlay[] = $player['Login'];
+                    $toPlay[] = $login;
+                    $this->playerList->setStatus($login, PlayerStatus::KnockedOut);
+                    $this->playerList->setLives($login, 0);
                 }
                 else
                 {
-                    $toSpec[] = $player['Login'];
+                    $toSpec[] = $login;
+                    // Perform a DNF instead of abruptly removing the player, so there's no additional KOs
+                    $this->scores->set($login, $player['PlayerId'], $player['NickName'], Scores::DidNotFinish);
                 }
             }
-            elseif ($player['Lives'] === 0)
+            elseif ($player['Lives'] <= 0)
             {
                 // Reinstated
                 $status = $this->koStatus === KnockoutStatus::Tiebreaker ? PlayerStatus::Shelved : PlayerStatus::Playing;
-                $this->playerList->setStatus($player['Login'], $status);
-                $toForcePlay[] = $player['Login'];
+                $this->playerList->setStatus($login, $status);
+                $toForcePlay[] = $login;
             }
         }
         forcePlay($toForcePlay, true);
