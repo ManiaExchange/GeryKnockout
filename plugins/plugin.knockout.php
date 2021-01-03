@@ -4,7 +4,7 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-const Version = '2.0.3';
+const Version = '2.0.4';
 const MinimumLogLevel = Log::Information;
 
 
