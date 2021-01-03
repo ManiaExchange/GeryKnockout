@@ -320,7 +320,7 @@ class Log
 class Actions
 {
     const ToggleHUD = 98;
-    const Cancel = 99;
+    const Dismiss = 99;
     const ConfirmOptOut = 501;
     const CliReferencePage1 = 511;
     const CliReferencePage2 = 512;
@@ -567,7 +567,7 @@ class Text
     }
 
     /**
-     * Removes all formatting in a string.
+     * Removes all formatting in a string, leaving formatting tags out.
      *
      * @param string $text The text to remove formatting from.
      *
@@ -576,6 +576,18 @@ class Text
     public static function clean($text)
     {
         return self::findAndReplaceCallback($text, function() { return ''; });
+    }
+
+    /**
+     * Sanitizes a string such that formatting tags are explicitly shown (e.g. `$g` -> `$$g`).
+     *
+     * @param string $text The text to remove formatting from.
+     *
+     * @return string The unformatted equivalent of the input text.
+     */
+    public static function sanitize($text)
+    {
+        return self::findAndReplaceCallback($text, function($tag) { return "\$$tag"; });
     }
 
     /**
@@ -604,6 +616,7 @@ class Text
 
     private static function format($text, $baseColor, $highlight, $baseStyle, $startWithBaseStyle)
     {
+        // Returns from a highlight to the original base color if needed
         $highlight_inv = self::findAndReplace(self::invert($highlight), '$g', $baseColor);
         $callback = function($tag, $isOpeningTag) use($baseStyle, $baseColor, $highlight, $highlight_inv)
         {
@@ -619,9 +632,7 @@ class Text
                     return $tag;
             }
         };
-        Log::debug(sprintf('before: %s', $text));
         $formatted = self::findAndReplaceCallback($text, $callback);
-        Log::debug(sprintf('after: %s', $formatted));
         if ($startWithBaseStyle) return "{$baseStyle}{$baseColor}{$formatted}";
         else return "{$baseColor}{$formatted}";
     }
@@ -1036,6 +1047,33 @@ class Scores
     }
 
     /**
+     * Removes the score (if set) of the given player. The player will not be appearing in
+     * scoreboards.
+     *
+     * @param string $login The login of the player.
+     *
+     * @return bool True if the player was found and their score was removed.
+     */
+    public function remove($login)
+    {
+        $logins = array_map(
+            function($player) { return $player['Login']; },
+            $this->scores
+        );
+        $index = array_search($login, $logins, true);
+        if ($index === false)
+        {
+            return false;
+        }
+        else
+        {
+            unset($this->scores[$index]);
+            $this->scores = array_values($this->scores);
+            return true;
+        }
+    }
+
+    /**
      * Explicitly sets a score that might be lower than the current score. Note that this should
      * only be used for administrative operations as it is less performant than submitScore.
      *
@@ -1359,7 +1397,7 @@ class PlayerList
     }
 
     /**
-     * Returns the players who are in the KO.
+     * Returns the players who are in the knockout.
      */
     public function getPlaying()
     {
@@ -1370,7 +1408,7 @@ class PlayerList
     }
 
     /**
-     * Returns the players who are in the KO.
+     * Returns the players who are in the knockout.
      */
     public function getPlayingOrShelved()
     {
@@ -1381,7 +1419,7 @@ class PlayerList
     }
 
     /**
-     * Returns the number of players who are in the KO.
+     * Returns the number of players who are in the knockout.
      */
     public function countPlaying()
     {
@@ -1400,6 +1438,7 @@ class UI
     const Dialog = 440;
     const MultiPageDialog = 450;
     const Prompt = 460;
+    const Message = 470;
 
     private static function statusBarManialink($playerStatus, $knockoutStatus, $roundNumber, $numberOfPlayers, $numberOfKOs)
     {
@@ -1540,16 +1579,17 @@ class UI
         {
             switch (strlen($position))
             {
-                case 1: return 1.5;
-                case 2: return 2.4;
-                case 3: return 3.3;
-                default: return 4.2;
+                case 0: return 0.6;
+                case 1: return 1.5;    // 1.
+                case 2: return 2.4;    // 10.
+                case 3: return 3.3;    // 100.
+                default: return 4.2;   // 1000. +
             }
         };
         $scoreWidth = function($score)
         {
             $length = strlen($score);
-            if ($length >= 10) return 8.3;      // 1:00:00.00
+            if ($length >= 10) return 8.3;      // 1:00:00.00 +
             elseif ($length >= 8) return 7.0;   //   10:00.00
             elseif ($length >= 7) return 6.0;   //    1:00.00
             else return 4.3;                    //        DNF
@@ -1748,17 +1788,17 @@ class UI
      */
     public static function showInfoDialog($text, $logins)
     {
-        if (is_string($logins)) $logins = array($logins);
         $manialink = '
             <manialink id="' . self::Dialog . '">
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="-40 43 1">
                     <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
                     <label posn="0 0 1" sizen="80 3" halign="left" style="TextStaticSmall">' . $text . '</label>
-                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="99">Ok</label>
+                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="' . Actions::Dismiss . '">Ok</label>
                 </frame>
             </manialink>
         ';
+        if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
         QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
     }
@@ -1778,7 +1818,6 @@ class UI
      */
     public static function showMultiPageDialog($text, $logins, $currentPageNumber, $totalPages, $prevPageActionId = null, $nextPageActionId = null)
     {
-        if (is_string($logins)) $logins = array($logins);
         $prevPage = is_null($prevPageActionId)
             ? '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="StarGold" />'
             : '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="ArrowPrev" action="' . $prevPageActionId . '" />';
@@ -1791,7 +1830,7 @@ class UI
                 <frame posn="-40 43 1">
                     <quad posn="-1 1 0" sizen="82 78" halign="top" valign="left" style="Bgs1" substyle="BgWindow3" />
                     <label posn="0 0 1" sizen="80 3" halign="left" style="TextStaticSmall">' . $text . '</label>
-                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="99">Ok</label>
+                    <label posn="40 -73 1" sizen="1 1" halign="center" valign="center" style="CardButtonMedium" action="' . Actions::Dismiss . '">Ok</label>
                     <frame posn="72 -73 1">
                         <quad posn="0 0 0" sizen="14 4" halign="center" valign="center" style="Bgs1" substyle="BgButton" />
                         <label posn="-5 0.1 1" sizen="6 4" halign="left" valign="center">$o$444' . $currentPageNumber . '/' . $totalPages . '</label>
@@ -1801,6 +1840,7 @@ class UI
                 </frame>
             </manialink>
         ';
+        if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
         QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
     }
@@ -1816,7 +1856,6 @@ class UI
      */
     public static function showPrompt($text, $actionId, $logins)
     {
-        if (is_string($logins)) $logins = array($logins);
         $nbLines = substr_count($text, "\n") + 1;
         $textboxHeight = $nbLines * 2.5;
         $print = function($value) { return sprintf('%1.1f', $value); };
@@ -1825,15 +1864,51 @@ class UI
                 <format style="TextRaceChat" textsize="1.0" />
                 <frame posn="0 0 1">
                     <quad posn="0 0 0" sizen="64.8 ' . $print($textboxHeight + 12.0) . '" halign="center" valign="center" style="Bgs1" substyle="BgWindow3" />
-                    <!-- <quad posn="-30.5 ' . $print(0.5 * $textboxHeight + 3.0) . ' 0.5" sizen="61 ' . $print($textboxHeight) . '" halign="left" valign="top" bgcolor="8888" /> -->
                     <label posn="0 ' . $print(0.5 * $textboxHeight + 3.0) . ' 1" sizen="61 ' . $print($textboxHeight) . '" halign="center" valign="top" style="TextStaticSmall">' . $text . '</label>
                     <label posn="-14.9 ' . $print(-0.5 * $textboxHeight - 1.0) . ' 1" halign="center" valign="center" style="CardButtonMedium" action="' . $actionId . '">Yes</label>
-                    <label posn="14.9 ' . $print(-0.5 * $textboxHeight - 1.0) . ' 1" halign="center" valign="center" style="CardButtonMedium" action="99">No</label>
+                    <label posn="14.9 ' . $print(-0.5 * $textboxHeight - 1.0) . ' 1" halign="center" valign="center" style="CardButtonMedium" action="' . Actions::Dismiss . '">No</label>
                 </frame>
             </manialink>
         ';
+        if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
         QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
+    }
+
+    /**
+     * Shows a small, scalable message with larger text and no buttons.
+     *
+     * @param string $text The text to display. Must be manually broken into lines, otherwise, the
+     * text will become crammed.
+     * @param int $duration A timeout (in seconds) to hide the message. Set to 0 to show
+     * permanently.
+     * @param string|array $logins [Optional] The login or logins to display the prompt for. If
+     * null, the message is shown for all players on the server.
+     */
+    public static function showMessage($text, $timeout, $logins = null)
+    {
+        $nbLines = substr_count($text, "\n") + 1;
+        $textboxHeight = $nbLines * 2.5;
+        $print = function($value) { return sprintf('%1.1f', $value); };
+        $manialink = '
+            <manialink id="' . self::Message . '">
+                <format style="TextRaceChat" textsize="1.0" />
+                <frame posn="0 -2 1">
+                    <quad posn="0 0 0" sizen="56 ' . $print($textboxHeight + 11.5) . '" halign="center" valign="center" style="Bgs1InRace" substyle="BgWindow2" />
+                    <label posn="0 1.0   1" sizen="56 ' . $print($textboxHeight) . '" halign="center" valign="center" scale="1.5" style="TextStaticSmall">$s' . $text . '</label>
+                </frame>
+            </manialink>
+        ';
+        if (is_null($logins))
+        {
+            QueryManager::query('SendDisplayManialinkPage', $manialink, $timeout * 1000, true);
+        }
+        else
+        {
+            if (is_string($logins)) $logins = array($logins);
+            $commaSeparatedLogins = implode(',', $logins);
+            QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, $timeout * 1000, true);
+        }
     }
 }
 
@@ -1893,7 +1968,7 @@ class KOMultiplier
      * Gets the number of KOs to perform in this round.
      *
      * @param int $roundNumber The current round number.
-     * @param int $numberOfPlayersLeft The number of players left in the KO.
+     * @param int $numberOfPlayersLeft The number of players left in the knockout.
      *
      * @return int The number of KOs to be applied this round.
      */
@@ -1914,7 +1989,7 @@ class KOMultiplier
                 case self::Extra:
                     return (int) ceil($numberOfPlayersLeft / $this->value);
                 case self::Dynamic:
-                    $func = $this->solveCurve($this->baseCurve(), $roundNumber, $this->value, $numberOfPlayersLeft, 1);
+                    $func = $this->solveCurve($this->baseCurve(), $roundNumber, $this->value + 1, $numberOfPlayersLeft, 1);
                     return $func($roundNumber);
                 case self::Tiebreaker:
                     return $this->value;
@@ -2099,7 +2174,6 @@ class KOMultiplier
     {
         $this->mode = self::None;
         $this->value = null;
-        $this->projection = array();
     }
 
     public function revert()
@@ -2553,8 +2627,8 @@ class KnockoutRuntime
     /**
      * Starts the knockout.
      *
-     * @param array $players  Players to start with (result of GetPlayerList query)
-     * @param bool $now       True to skip the current track and start the KO immediately.
+     * @param array $players Players to start with (result of GetPlayerList query)
+     * @param bool $now True to skip the current track and start the knockout immediately.
      */
     private function start($players, $now = false)
     {
@@ -2647,6 +2721,17 @@ class KnockoutRuntime
         $this->onKoStatusUpdate();
     }
 
+    /**
+     * Returns true if there is a live round ongoing. Will return false if it's currently a warmup,
+     * a podium or the knockout is not running.
+     */
+    private function isLive()
+    {
+        return ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
+            && !$this->isWarmup
+            && !$this->isPodium;
+    }
+
     private function remove($playersToRemove, $status)
     {
         foreach ($playersToRemove as $player)
@@ -2664,20 +2749,8 @@ class KnockoutRuntime
                 switch ($target['Status'])
                 {
                     case PlayerStatus::Playing:
-                        $shouldDNF =
-                            ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
-                            && PlayerStatus::isIn($target['Status']);
-                        if ($shouldDNF)
-                        {
-                            $this->scores->set($login, $target['PlayerId'], $target['NickName'], Scores::DidNotFinish);
-                            $this->playerList->setLives($login, 1);
-                        }
-                        else
-                        {
-                            $this->playerList->setStatus($login, $status);
-                            $this->playerList->setLives($login, 0);
-                        }
-                        break;
+                        if ($this->isLive()) $this->scores->remove($login);
+                        // Flow into next case
                     case PlayerStatus::Shelved:
                         $this->playerList->setStatus($login, $status);
                         $this->playerList->setLives($login, 0);
@@ -2720,26 +2793,29 @@ class KnockoutRuntime
         $toSpec = array();
         foreach ($playersToUpdate as $player)
         {
+            $login = $player['Login'];
             $remainingLives = $player['Lives'] + $lives;
-            $this->playerList->setLives($player['Login'], max(0, $remainingLives));
+            $this->playerList->setLives($login, max(0, $remainingLives));
             if ($remainingLives <= 0)
             {
                 // Knocked out
+                $this->playerList->setStatus($login, PlayerStatus::KnockedOut);
                 if ($this->openWarmup && $this->isWarmup)
                 {
-                    $toPlay[] = $player['Login'];
+                    $toPlay[] = $login;
                 }
                 else
                 {
-                    $toSpec[] = $player['Login'];
+                    $toSpec[] = $login;
+                    $this->scores->remove($login);
                 }
             }
-            elseif ($player['Lives'] === 0)
+            elseif ($player['Lives'] <= 0)
             {
                 // Reinstated
                 $status = $this->koStatus === KnockoutStatus::Tiebreaker ? PlayerStatus::Shelved : PlayerStatus::Playing;
-                $this->playerList->setStatus($player['Login'], $status);
-                $toForcePlay[] = $player['Login'];
+                $this->playerList->setStatus($login, $status);
+                $toForcePlay[] = $login;
             }
         }
         forcePlay($toForcePlay, true);
@@ -2908,7 +2984,7 @@ class KnockoutRuntime
     }
 
     /**
-     * Skips the upcoming map(s) until the author is not present in the KO.
+     * Skips the upcoming map(s) until the author is not present in the knockout.
      */
     private function replaceNextTrackIfNeeded()
     {
@@ -3007,28 +3083,12 @@ class KnockoutRuntime
 
     /**
      * Skips the warmup phase. Assumes there is a warmup currently running.
+     *
+     * If the game mode has changed, it will take effect as this function is called.
      */
     private function skipWarmup()
     {
-        switch ($this->gameMode)
-        {
-            case GameMode::Team:
-            case GameMode::Stunts:
-            case GameMode::TimeAttack:
-                // Todo: ensure game mode settings are not changed
-                QueryManager::query('RestartChallenge');
-                break;
-
-            case GameMode::Cup:
-                QueryManager::query('RestartChallenge', true);
-                break;
-
-            case GameMode::Laps:
-            case GameMode::Rounds:
-                // Todo: ensure game mode settings are not changed
-                QueryManager::query('RestartChallenge');
-                break;
-        }
+        QueryManager::query('SetWarmUp', false);
     }
 
     /**
@@ -3047,25 +3107,24 @@ class KnockoutRuntime
         //   - If someone have finished: completes the round and starts the next one
         switch ($this->gameMode)
         {
-            case GameMode::Laps:
             case GameMode::Stunts:
             case GameMode::TimeAttack:
+                // No way to restart without warmup if settings have changed
                 QueryManager::query('RestartChallenge');
                 break;
 
             case GameMode::Cup:
-                QueryManager::query('RestartChallenge', true);
-                break;
-
+            case GameMode::Laps:
             case GameMode::Rounds:
             case GameMode::Team:
                 // Get scores of the current round
                 $scores = $this->scores->getSortedScores();
                 if (isset($scores[0]) && $scores[0]['Score'] > 0)
                 {
-                    // If someone have finished, the only way to restart the round is to start from
-                    // round 1
-                    QueryManager::query('RestartChallenge');
+                    // If someone have finished, the only way to restart the round (without points
+                    // being applied) is to start from round 1
+                    if ($this->gameMode === GameMode::Cup) QueryManager::query('RestartChallenge', true);
+                    else QueryManager::query('RestartChallenge');
                 }
                 else
                 {
@@ -3369,10 +3428,9 @@ class KnockoutRuntime
 
         if (KnockoutStatus::isInProgress($this->koStatus) && $this->roundNumber > 0)
         {
-            $this->updateStatusBar($login);
-            $this->announceRoundInChat($login);
             if ($didJoin)
             {
+                $this->updateStatusBar();
                 if (!$this->isWarmup && !$this->isPodium && $this->roundNumber === 1)
                 {
                     Chat::info('The knockout has started! Gogogo', $login);
@@ -3382,14 +3440,19 @@ class KnockoutRuntime
                     Chat::info('The knockout is about to start! Gogogo', $login);
                 }
             }
-            elseif ($didRejoin)
-            {
-                Chat::info('You rejoined in time! Gogogo', $login);
-            }
             else
             {
-                Chat::info('You have entered a match in progress', $login);
+                $this->updateStatusBar($login);
+                if ($didRejoin)
+                {
+                    Chat::info('You rejoined in time! Gogogo', $login);
+                }
+                else
+                {
+                    Chat::info('You have entered a match in progress', $login);
+                }
             }
+            $this->announceRoundInChat($login);
         }
     }
 
@@ -3493,6 +3556,8 @@ class KnockoutRuntime
                 // Check if it's the first player to retire and whether a false start
                 // can be considered
                 if ($this->shouldCheckForFalseStarts
+                    && $this->gameMode !== GameMode::Stunts
+                    && $this->gameMode !== GameMode::TimeAttack
                     && $timeOrScore === 0
                     && $this->falseStartCount < $this->maxFalseStarts)
                 {
@@ -3500,17 +3565,15 @@ class KnockoutRuntime
                     $currentTime = microtime(true);
                     if ($currentTime - $this->roundStartTime <= 1.)
                     {
-                        // Must be a player in the KO who retires
+                        // Must be a player in the knockout who retires
                         if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
                         {
                             $this->koStatus = KnockoutStatus::RestartingRound;
                             $this->falseStartCount++;
                             QueryManager::query('ForceEndRound');
-                            Chat::info(sprintf(
-                                'False start! Restarting the round... (%d/%d)',
-                                $this->falseStartCount,
-                                $this->maxFalseStarts
-                            ));
+                            $text = "False start! Restarting the round... ({$this->falseStartCount}/{$this->maxFalseStarts})";
+                            Chat::info($text);
+                            UI::showMessage($text, 5);
                             return;
                         }
                     }
@@ -3874,7 +3937,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko start$x or $x/ko start now$x)', $args[1]));
+            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko start$x or $x/ko start now$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -3952,7 +4015,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Unexpected argument $x%s$x (expected $x/ko skip$x or $x/ko skip warmup$x)', $args[1]));
+            $onError(sprintf('Unexpected argument $x%s$x (expected $x/ko skip$x or $x/ko skip warmup$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -3974,29 +4037,31 @@ class KnockoutRuntime
         }
         elseif (!isset($args[1]))
         {
-            if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+            if ($this->koStatus === KnockoutStatus::Tiebreaker)
             {
-                if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                {
-                    $this->scores->reset();
-                }
-                else
-                {
-                    $this->koStatus = KnockoutStatus::RestartingRound;
-                    $this->updateStatusBar();
-                }
+                $this->scores->reset();
+            }
+            elseif ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
+            {
+                $this->koStatus = KnockoutStatus::RestartingRound;
+                $this->updateStatusBar();
             }
             $this->restartRound();
-            Chat::info('Restarting the current round');
+            $text = 'Restarting the current round';
+            Chat::info($text);
+            if ($this->gameMode === GameMode::Rounds || $this->gameMode === GameMode::Team)
+            {
+                UI::showMessage($text, 5);
+            }
         }
         elseif (strtolower($args[1]) === 'warmup')
         {
+            if ($this->koStatus === KnockoutStatus::Tiebreaker)
+            {
+                $this->returnFromTiebreaker();
+            }
             if ($this->koStatus !== KnockoutStatus::Starting && $this->koStatus !== KnockoutStatus::StartingNow)
             {
-                if ($this->koStatus === KnockoutStatus::Tiebreaker)
-                {
-                    $this->returnFromTiebreaker();
-                }
                 $this->koStatus = KnockoutStatus::RestartingTrack;
                 $this->updateStatusBar();
             }
@@ -4005,7 +4070,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko restart$x or $x/ko restart warmup$x)', $args[1]));
+            $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $x/ko restart$x or $x/ko restart warmup$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -4042,7 +4107,7 @@ class KnockoutRuntime
             }
             else
             {
-                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                $onError(sprintf('Error: login $x%s$x could not be found', Text::sanitize($args[1])));
                 return;
             }
 
@@ -4058,7 +4123,7 @@ class KnockoutRuntime
                 }
                 else
                 {
-                    $onError(sprintf('$x%s$x is already playing', $args[1]));
+                    $onError(sprintf('$x%s$x is already playing', Text::sanitize($args[1])));
                 }
             }
             else
@@ -4066,11 +4131,11 @@ class KnockoutRuntime
                 $this->add($playersToAdd);
                 if ($args[1] === '*')
                 {
-                    Chat::info('All players have been added to the KO');
+                    Chat::info('All players have been added to the knockout');
                 }
                 else
                 {
-                    Chat::info(sprintf('$x%s$z has been added to the KO', $playersToAdd[0]['NickName']));
+                    Chat::info(sprintf('$x%s$z has been added to the knockout', $playersToAdd[0]['NickName']));
                 }
             }
         }
@@ -4084,7 +4149,7 @@ class KnockoutRuntime
      * - `/ko remove (<login> | *)`
      * - `/ko spec (<login> | *)`
      */
-    private function cliRemove($args, $onError)
+    private function cliRemove($args, $onError, $issuerLogin)
     {
         if ($this->koStatus === KnockoutStatus::Idle)
         {
@@ -4111,7 +4176,7 @@ class KnockoutRuntime
             }
             else
             {
-                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                $onError(sprintf('Error: login $x%s$x could not be found', Text::sanitize($args[1])));
                 return;
             }
 
@@ -4129,7 +4194,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('$x%s$x is already knocked out', $args[1]));
+                        $onError(sprintf('$x%s$x is already knocked out', Text::sanitize($args[1])));
                     }
                 }
                 else
@@ -4137,7 +4202,7 @@ class KnockoutRuntime
                     $this->remove($playersToRemove, PlayerStatus::KnockedOut);
                     if ($args[1] === '*')
                     {
-                        Chat::info('All players have been removed from the KO');
+                        Chat::info('All players have been removed from the knockout');
                     }
                     else
                     {
@@ -4148,6 +4213,10 @@ class KnockoutRuntime
                         else
                         {
                             Chat::info(sprintf('$x%s$z has been removed from the knockout', $playersToRemove[0]['NickName']));
+                            if ($this->isLive())
+                            {
+                                Chat::info2('Note: the player is DNF and will be knocked out once the round has completed', $issuerLogin);
+                            }
                         }
                     }
                 }
@@ -4166,7 +4235,7 @@ class KnockoutRuntime
                     }
                     else
                     {
-                        $onError(sprintf('$x%s$x is already spectating', $args[1]));
+                        $onError(sprintf('$x%s$x is already spectating', Text::sanitize($args[1])));
                     }
                 }
                 else
@@ -4179,6 +4248,10 @@ class KnockoutRuntime
                     else
                     {
                         Chat::info(sprintf('$x%s$z has been put to spec', $playersToRemove[0]['NickName']));
+                        if ($this->isLive())
+                        {
+                            Chat::info2('Note: the player is DNF and will be knocked out once the round has completed', $issuerLogin);
+                        }
                     }
                 }
             }
@@ -4219,7 +4292,7 @@ class KnockoutRuntime
             }
             else
             {
-                $onError(sprintf('Error: login $x%s$x could not be found', $args[1]));
+                $onError(sprintf('Error: login $x%s$x could not be found', Text::sanitize($args[1])));
                 return;
             }
 
@@ -4241,7 +4314,7 @@ class KnockoutRuntime
             }
             elseif (!is_numeric($args[2]))
             {
-                $onError(sprintf('Error: argument $x%s$x is not a number', $args[2]));
+                $onError(sprintf('Error: argument $x%s$x is not a number', Text::sanitize($args[2])));
             }
             elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
             {
@@ -4250,8 +4323,8 @@ class KnockoutRuntime
             else
             {
                 $sign = substr($args[2], 0, 1);
-                $value = abs((int) $args[2]);
-                $livesStr = pluralize($value, 'life', 'lives');
+                $value = (int) $args[2];
+                $livesStr = pluralize(abs($value), 'life', 'lives');
                 if ($value === 0)
                 {
                     $onError(sprintf('Error: argument $x%d$x must be a non-zero value', $value));
@@ -4270,7 +4343,7 @@ class KnockoutRuntime
                         else
                         {
                             $actionStr = $sign === '+' ? 'increased' : 'decreased';
-                            Chat::info(sprintf('Lives per player has been %s by %d (is now %d)', $actionStr, $value, $this->lives));
+                            Chat::info(sprintf('Lives per player has been %s by %d (is now %d)', $actionStr, abs($value), $this->lives));
                         }
                     }
                     else
@@ -4342,7 +4415,7 @@ class KnockoutRuntime
                     }
                     elseif (!is_numeric($args[2]))
                     {
-                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi constant <x KOs per round>$x)', $args[1]));
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi constant <x KOs per round>$x)', Text::sanitize($args[2])));
                     }
                     elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                     {
@@ -4375,7 +4448,7 @@ class KnockoutRuntime
                     }
                     elseif (!is_numeric($args[2]))
                     {
-                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi extra <per x players>$x)', $args[1]));
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi extra <per x players>$x)', Text::sanitize($args[2])));
                     }
                     elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                     {
@@ -4408,7 +4481,7 @@ class KnockoutRuntime
                     }
                     elseif (!is_numeric($args[2]))
                     {
-                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi dynamic <x rounds>$x)', $args[1]));
+                        $onError(sprintf('Syntax error: argument $x%s$x must be a number (usage: $x/ko multi dynamic <x rounds>$x)', Text::sanitize($args[2])));
                     }
                     elseif (str_contains($args[2], '.') || str_contains($args[2], ','))
                     {
@@ -4433,7 +4506,7 @@ class KnockoutRuntime
                 default:
                     if (isset($args[1]))
                     {
-                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $xconstant$x, $xextra$x or $xnone$x)', $args[1]));
+                        $onError(sprintf('Syntax error: unexpected argument $x%s$x (expected $xconstant$x, $xextra$x or $xnone$x)', Text::sanitize($args[1])));
                     }
                     else
                     {
@@ -4474,7 +4547,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
+            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -4496,11 +4569,11 @@ class KnockoutRuntime
         }
         elseif (!is_numeric($args[1]))
         {
-            $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
+            $onError(sprintf('Error: argument $x%s$x is not a number', Text::sanitize($args[1])));
         }
         elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
         {
-            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[1]));
         }
         else
         {
@@ -4549,7 +4622,7 @@ class KnockoutRuntime
         }
         else
         {
-            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', $args[1]));
+            $onError(sprintf('Error: unexpected argument $x%s$x (expected $xon$x or $xoff$x)', Text::sanitize($args[1])));
         }
     }
 
@@ -4571,11 +4644,11 @@ class KnockoutRuntime
         }
         elseif (!is_numeric($args[1]))
         {
-            $onError(sprintf('Error: argument $x%s$x is not a number', $args[1]));
+            $onError(sprintf('Error: argument $x%s$x is not a number', Text::sanitize($args[1])));
         }
         elseif (str_contains($args[1], '.') || str_contains($args[1], ','))
         {
-            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[2]));
+            $onError(sprintf('Error: floating point numbers ($x%s$x) are not supported', $args[1]));
         }
         else
         {
@@ -4742,7 +4815,7 @@ class KnockoutRuntime
 
                 case 'remove':
                 case 'spec':
-                    $this->cliRemove($args, $onError);
+                    $this->cliRemove($args, $onError, $issuerLogin);
                     break;
 
                 case 'lives':
@@ -4782,7 +4855,7 @@ class KnockoutRuntime
                     break;
 
                 default:
-                    $onError(sprintf('Syntax error: unexpected argument $x%s$x (see $x/ko help$x for usages)', $args[0]));
+                    $onError(sprintf('Syntax error: unexpected argument $x%s$x (see $x/ko help$x for usages)', Text::sanitize($args[0])));
                     break;
             }
         }
@@ -4936,64 +5009,9 @@ class KnockoutRuntime
     }
 
     /**
-     * Displays a dialog with information about the KO.
+     * Command to opt out if someone does not want to participate in a knockout.
      *
-     * @param array $args Arguments to the command.
-     * @param array $issuer A single-element array.
-     *
-     *     $issuer = [
-     *         [0] => (string) The login of the player who issued the command.
-     *         [1] => (string) The nickname of the player who issued the command.
-     *     ]
-     */
-    public function infoChatCommand($args, $issuer)
-    {
-        $login = $issuer[0];
-        $text = implode("\n\n", array(
-            '$oAbout the TM$f00X$g Knockout United$o',
-
-            implode("\n", array(
-                'The TMX Knockout United is a weekly knockout event designed to be fun! It provides casual gameplay',
-                'and an element of unpredictable results. No training of tracks is required - just join the server in time and',
-                'play.'
-            )),
-
-            implode("\n", array(
-                'The event is held every Friday at 22:00 CET/CEST. We usually play KO9 (Stunts) the first Friday of the',
-                'month and other track groups the other weeks.'
-            )),
-
-            implode("\n", array(
-                'When the knockout starts, everyone is put to play. If the HUD is enabled, a status bar is shown at the top',
-                '(click on the TMGery button on the top left to enable/disable). We usually play Rounds with one',
-                'warmup and one live round for each track. At the end of each round, the last placed driver, or all those',
-                'who do not finish the race, are knocked out until one player remains as the winner.'
-            )),
-
-            implode("\n", array(
-                "If you experience a disconnection, you may get reinstated only if you haven't been knocked out yet and,",
-                'without missing any rounds,',
-                '    - rejoin during the warmup (Rounds, Laps)',
-                '    - rejoin with time to spare (Time Attack, Stunts)'
-            )),
-
-            implode("\n", array(
-                'If you do get knocked out, don\'t fret! You can still play during warmups, and there are multiple knockouts',
-                'to be played; you can participate again if you wait for the next knockout.'
-            )),
-
-            'The most important part is: never give up! Someone may have retired :)',
-
-            implode("\n", array(
-                '$4af$l[http://bit.ly/TMXSpreadsheet]Results and map list$l',
-                '$l[http://discordapp.com/invite/Ttkw54Y]TMX Discord$l'
-            )),
-        ));
-        UI::showInfoDialog(Text::info(" \n$text"), $login);
-    }
-
-    /**
-     * Invoked when a player does not want to participate in the KO.
+     * This function is called when a user sends a chat message starting with '/opt'.
      *
      * @param array $args Arguments to the command.
      * @param array $issuer A single-element array.
@@ -5074,7 +5092,7 @@ class KnockoutRuntime
         }
         else
         {
-            $msg = sprintf('Syntax error: unexpected argument $x%s$x (expected $x/opt out$x)', $args[0]);
+            $msg = sprintf('Syntax error: unexpected argument $x%s$x (expected $x/opt out$x)', Text::sanitize($args[0]));
             Chat::error($msg, $issuerLogin);
         }
     }
@@ -5171,7 +5189,6 @@ $this->AddEvent('StatusChanged', 'onStatusChange');
 $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
 
 $this->addChatCommand('ko', true, 'adminChatCommands');
-$this->addChatCommand('info', true, 'infoChatCommand');
 $this->addChatCommand('opt', true, 'optChatCommand');
 
 ?>

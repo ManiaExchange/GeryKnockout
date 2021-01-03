@@ -71,14 +71,14 @@ Use [/ko openwarmup](https://github.com/ManiaExchange/GeryKnockout/blob/main/doc
 
 Players may be able to be automatically put back in the knockout if they disconnected but rejoin in time. This is valid as long as the given player is not knocked out yet. If there is a disconnection during the warmup, they may rejoin until the next live round has ended.
 
-Currently, players are knocked out at the end of each round; which means that a player may reconnect during a live round and attempt to finish.
+Currently, players are knocked out at the end of each round; which means that a player may reconnect during a live round and attempt to finish. If the player does not make it in time, it's a free round.
 
-If a player joins the server, they'll be forced in if they are eligible. If not, their status will be `Knocked out` if they joined using *Play* and `Spectating` if they joined as a spectator. The plugin does not put a password on the server during a knockout. When the knockout is stopped, everyone is free to play unless a password is set manually.
+If a player joins the server, they'll be forced in if they are eligible. If not, their status will be `Knocked out` if they joined using *Play* and `Spectating` if they joined as a spectator. When the knockout is stopped, everyone on the server is free to play.
 
-Likewise, if someone disconnects during a knockout, they will be eligible to join
+The plugin does not put a password on the server during a knockout. To prevent players from joining the server as spectators, set a password explicitly using `/ServerPass <password>`.
 
 ### Tiebreakers
-When a round ends and there is a tie among players who risk getting knocked out and players who don't, there is an ambiguity as of who shall be knocked out. If tiebreakers are enabled, the script will enter a custom tiebreaker mode when this happens. The current round will be restarted with the tied players only, while surviving players are temporarily put to spec (shelved). Once the tiebreaker ends, the knockout resumes as normal on the next round.
+When a round ends, there may be a tie among players who are in safe spots and players who risk getting knocked out – which makes it ambiguous as of who shall actually be knocked out. If tiebreakers are enabled, the script will enter a custom tiebreaker mode when this happens. The current round will be restarted with the tied players only, while surviving players are temporarily put to spec (shelved). Once the tiebreaker ends, the knockout resumes as normal on the next round.
 
 As an example, imagine the following standings in a round with 1 KO:
 
@@ -91,7 +91,7 @@ Player 5    0:53.57
 Player 2    0:53.57
 ```
 
-Since player 2 and 5 are tied, they will enter tiebreaker mode while player 1, 3 and 4 become shelved. Afterwards, the winner of the tiebreaker will rejoin the knockout with player 1, 3 and 4.
+Since player 2 and 5 are tied for last place, they will enter tiebreaker mode while player 1, 3 and 4 are temporarily shelved. Afterwards, the knockout will resume with the winner of the tiebreaker together with player 1, 3 and 4.
 
 Now, an example with multiple KOs:
 
@@ -108,7 +108,7 @@ Player 20   1:20.03
 
 In this case, player 20 will be knocked out regardless. However, players 4, 9 and 12 are tied and will therefore enter tiebreaker mode. In the tiebreaker, there will be 2 KOs performed since two of the players would have been knocked out otherwise.
 
-Tiebreakers will not initiate if the tied players DNF.
+Tiebreakers will not initiate if the tied players DNF. If there is a tie for last spot(s) in a tiebreaker, another tiebreaker will be initiated with the tied players only.
 
 This mode can be disabled using [/ko tiebreaker](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off). If disabled, ties are broken by when they were submitted; times which are set earlier are preferred.
 
@@ -148,9 +148,9 @@ Using this approach, we can observe that the number of KOs per round will increa
 ### Lives
 Players may be configured to have multiple lives. This can be configured before the start of the knockout, or while a knockout is in progress. By default, each player has 1 life.
 
-When a player gets last, they will lose a life. If it was their last life, they will get knocked out.
+When a player gets last, they will lose a life. If it was their last life, they will get knocked out – otherwise the player will remain in the knockout.
 
-The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). The number of lives may be relative (by using a + or - sign in front of the number) or absolute.
+The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). Lives can be adjusted for a single player or all player currently participating, and the adjustment may be relative (by using + and -) or absolute.
 
 ### Rounds per track
 If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. KOs will be performed after each round. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0. Use `/round <x>` to specify the number of rounds per map.
@@ -178,14 +178,14 @@ Knockout status    | Description
 `Restarting round` | Round is being restarted by using `/ko restart`. No KOs are performed.
 `Restarting track` | Track is being restarted by using `/ko restart warmup`. No KOs are performed.
 `Skipping track`   | Track is being skipped by using `/ko skip`. No KOs are performed.
-`Tiebreaker`       | Tiebreaker mode among tied players. Non-participating players are put to player status `Shelved`.
+`Tiebreaker`       | Tiebreaker mode among tied players. Participating players not part of the tiebreaker are put to player status `Shelved`.
 
 Player status | Description
 :------------ | :----------
 `Playing`     | Participating in the knockout.
 `Knocked out` | Out of the knockout, but can play during warmups.
 `Spectating`  | Out of the knockout, and won't be playing during warmups.
-`Shelved`     | Temporarily put aside for a tiebreaker. Once the tiebreaker is over, shelved players will be playing again.
+`Shelved`     | Temporarily put aside for a tiebreaker. Once the tiebreaker is over, shelved players will be put to `Playing` again.
 `Opting out`  | In the process of opting out of the knockout, but can still rejoin using `/opt in`.
 
 Note: this list is not exhaustive - there are some additional states that are not displayed in the status bar.
@@ -202,6 +202,8 @@ Color | Description
 🟨     | 2 places from being knocked out.
 🟧     | 1 place from being knocked out.
 🟥     | In danger of being knocked out.
+
+Note: the colors shown may not be accurate if there are ties among players.
 
 ## Opting out
 A player may choose to opt out of the knockout using [/opt out](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#opt-out). Doing so in the middle of a live round will make them retire and DNF, regardless of whether they finished or not. Otherwise, they may still change their mind using [/opt in](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#opt-in), as long as they do so by the time the next live round starts.
@@ -245,7 +247,6 @@ New admin commands:
 
 New public commands:
 
-- /info
 - /opt in
 - /opt out
 

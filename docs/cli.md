@@ -33,7 +33,9 @@ Note: if a player is reinstated and can't set a time/score on the current round,
 Note: adding players during a tiebreaker will make them able to play once the tiebreaker has ended. The tiebreaker will continue as normal, with the losing players losing a life.
 
 ### /ko remove (*login* | \*)
-Removes a player with login `login` from the knockout, regardless of how many lives they have. If the wildcard `*` is used, then everyone that are currently playing are removed from the knockout. If applied during a round, the player(s) will be put in spec and their runs will count as DNF (regardless whether they finished or not).
+Removes a player with login `login` from the knockout, regardless of how many lives they have. If the wildcard `*` is used, then everyone that are currently playing are removed from the knockout.
+
+If applied during a round, the player(s) will be put in spec and their runs will count as DNF (regardless whether they finished or not). Keep in mind that it won't be a free round; KOs are still performed as usual but without the removed player.
 
 Examples:
 
@@ -42,15 +44,11 @@ Examples:
 
 Note: `/ko remove *` will exit a tiebreaker.
 
-Note: if the command was performed during a round and `/ko restart` or `/ko skip` is used afterwards, the player will remain in the knockout.
-
 ### /ko spec (*login* | \*)
 Same as `/ko remove` but instead puts the player(s) into spectator status. Use if a knocked out player is afk and becomes a cause of synchronization delays.
 
 ### /ko lives (*login* | \*) [[+ | -]*lives*]
 Displays or adjusts the number of lives to use for the knockout. When adjusting, the number of lives may be relative (by using a plus or minus sign in front of the number of lives) or absolute. The change may be applied to a single player (using their login) or to everyone who is currently playing (using the wildcard `*`). If the number of lives is not supplied, the current number of lives for the given player(s) are displayed in chat.
-
-Players who are knocked out are not reinstated when using `/ko lives *`; the only way to do so is to specify their login.
 
 This command can be used during a knockout; players will get the same number of lives or get knocked out depending on what the new number is set to.
 
@@ -66,6 +64,10 @@ Examples:
 8. `/ko lives * -1` - removes a life from all players
 
 Examples 6, 7 and 8 will also adjust the value used for subsequent calls to `/ko add`.
+
+Note: Players who are knocked out are not reinstated when using `/ko lives *`; the only way to do so is to specify their login.
+
+Note: When reducing the number of lives relatively (using `/ko lives * -<lives>`), players may be knocked out.
 
 Note: `/ko lives * <lives>` will restore lost lives; everyone will have the same amount of lives regardless of how many they lost so far. To avoid this, use `/ko lives * +<lives>` and `/ko lives * -<lives>`.
 
@@ -112,9 +114,6 @@ Shows knockout mode, knockout status, player list and scores in a dialog window.
 Shows the list of commands.
 
 ## Public commands
-
-### /info
-Displays information about the knockout.
 
 ### /opt in
 Rejoins the knockout after having opted out. Works only if you're still eligible to join (the live round has not started yet).
