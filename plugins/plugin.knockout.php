@@ -4,7 +4,7 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-const Version = '2.0.4';
+const Version = '2.0.3 (beta)';
 const MinimumLogLevel = Log::Information;
 
 
@@ -5171,6 +5171,30 @@ class KnockoutRuntime
                 break;
         }
     }
+
+    /**
+     * @param array $args Arguments to the command.
+     * @param array $issuer A single-element array.
+     *
+     *     $issuer = [
+     *         [0] => (string) The login of the player who issued the command.
+     *         [1] => (string) The nickname of the player who issued the command.
+     *     ]
+     */
+    public function testChatCommand($args, $issuer)
+    {
+        $login = $issuer[0];
+        if (isadmin($login))
+        {
+            if ($args[0]) QueryManager::query('SetWarmUp', true);
+            else QueryManager::query('SetWarmUp', false);
+            Chat::info2('test done', $login);
+        }
+        else
+        {
+            Chat::error(" UNKNOWN COMMAND !", array($login));
+        }
+    }
 }
 
 $this->AddPlugin(new KnockoutRuntime());
@@ -5190,5 +5214,6 @@ $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
 
 $this->addChatCommand('ko', true, 'adminChatCommands');
 $this->addChatCommand('opt', true, 'optChatCommand');
+$this->addChatCommand('test', false, 'testChatCommand');
 
 ?>
