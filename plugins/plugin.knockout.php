@@ -2143,7 +2143,8 @@ class KOMultiplier
                         return max(1, $currentCurve($round) - $sgCurve);
                     };
                     // Check deviation of adjusted curve relative to non-discretized target curve
-                    if (abs($adjustedCurve($currentRound)) - $this->getNonDiscretizedScaledCurve($curve, $f) <= 0.5)
+                    $nonDiscretizedCurve = $this->getNonDiscretizedScaledCurve($curve, $f);
+                    if (abs($adjustedCurve($currentRound)) - $nonDiscretizedCurve($currentRound) <= 0.5)
                     {
                         Log::error('solveCurve did not converge; fStep is too small');
                         return $adjustedCurve;
