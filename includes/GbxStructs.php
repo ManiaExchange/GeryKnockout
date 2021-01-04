@@ -22,8 +22,8 @@ class SChallengeInfo
     /** @var string $author */
     public $author;
 
-    /** @var string $environment */
-    public $environment;
+    /** @var string $environnement */
+    public $environnement;
 
     /** @var string $mood */
     public $mood;
@@ -58,7 +58,7 @@ class SChallengeInfo
         $this->name = $array['Name'];
         $this->fileName = $array['FileName'];
         $this->author = $array['Author'];
-        $this->environment = $array['Environment'];
+        $this->environnement = $array['Environnement'];
         $this->mood = $array['Mood'];
         $this->bronzeTime = $array['BronzeTime'];
         $this->silverTime = $array['SilverTime'];

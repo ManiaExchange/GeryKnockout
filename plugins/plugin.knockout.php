@@ -4,7 +4,7 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-const Version = '2.0.4 (beta)';
+const Version = '2.1.0 (beta)';
 const MinimumLogLevel = Log::Information;
 
 
@@ -2080,6 +2080,7 @@ class KOMultiplier
 function isOnServer($login)
 {
     global $PlayerScript;
+
     return isset($PlayerScript[$login]);
 }
 
@@ -2094,6 +2095,7 @@ function isOnServer($login)
 function hasHudOn($login)
 {
     global $PlayerScript;
+
     if (isset($PlayerScript[$login]))
     {
         return $PlayerScript[$login] === '1';
@@ -2273,6 +2275,7 @@ class KnockoutRuntime
     private $isWarmup;
     private $isPodium;
     private $gameMode;
+    private $serverStatus;
 
     // Defaults
     private $defaultVoteTimeout = 60;
@@ -2302,6 +2305,7 @@ class KnockoutRuntime
         $this->isWarmup = false;
         $this->isPodium = false;
         $this->gameMode = -1;
+        $this->serverStatus = -1;
 
         $this->koMultiplier = new KOMultiplier();
         $this->lives = 1;
@@ -2325,6 +2329,8 @@ class KnockoutRuntime
         $status = $call->getStatus();
         $this->isPodium = !$this->isWarmup && $status['Code'] === ServerStatus::Finish;
         $this->gameMode = $call->getGameMode();
+        $status = $call->getStatus();
+        $this->serverStatus = $status[0];
 
         // In case the plugin crashed mid-KO
         UI::hideStatusBar();
@@ -2346,6 +2352,7 @@ class KnockoutRuntime
     private function getPlayersWithHudOn()
     {
         global $PlayerScript;
+
         return array_intersect_key(
             $this->playerList->getAll(),
             array_filter($PlayerScript, function($val) {
@@ -2357,6 +2364,7 @@ class KnockoutRuntime
     private function getPlayersWithHudOff()
     {
         global $PlayerScript;
+
         return array_intersect_key(
             $this->playerList->getAll(),
             array_filter($PlayerScript, function($val) {
@@ -2395,10 +2403,13 @@ class KnockoutRuntime
 
     private function updateScoreboard($login = null)
     {
-        $scores = $this->scores->getSortedScores();
-        $nbKOs = $this->kosThisRound;
-        $numberOfPlayers = $this->playerList->countPlaying();
-        UI::updateScoreboard($scores, $this->gameMode, $nbKOs, $numberOfPlayers, $login);
+        if ($this->serverStatus === ServerStatus::Play || $this->serverStatus === ServerStatus::Finish)
+        {
+            $scores = $this->scores->getSortedScores();
+            $nbKOs = $this->kosThisRound;
+            $numberOfPlayers = $this->playerList->countPlaying();
+            UI::updateScoreboard($scores, $this->gameMode, $nbKOs, $numberOfPlayers, $login);
+        }
     }
 
     private function announceRoundInChat($login = null)
@@ -3079,6 +3090,7 @@ class KnockoutRuntime
     {
         global $call;
         Log::debug(sprintf('onStatusChange %s', implode(' ', $args)));
+        $this->serverStatus = $args[0];
 
         switch ($args[0])
         {
@@ -3103,7 +3115,11 @@ class KnockoutRuntime
             case ServerStatus::Play:
                 if ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
                 {
-                    if ($this->gameMode !== GameMode::Stunts && $this->gameMode !== GameMode::TimeAttack)
+                    if ($this->gameMode === GameMode::Stunts || $this->gameMode === GameMode::TimeAttack)
+                    {
+                        $this->scores->initialize($this->playerList->getPlaying());
+                    }
+                    else
                     {
                         $this->shouldCheckForFalseStarts = true;
                         $this->roundStartTime = microtime(true);
