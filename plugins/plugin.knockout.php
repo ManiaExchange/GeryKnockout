@@ -8,6 +8,7 @@ const Version = '2.0.4 (beta)';
 const MinimumLogLevel = Log::Information;
 
 
+global $client;
 if (!isset($call)) $call = new GbxClient($client);
 if (!isset($multicall)) $multicall = new GbxClientMulticall($client);
 
@@ -87,48 +88,6 @@ if (!function_exists('str_contains')) {
     }
 }
 
-
-// For XML-RPC methods
-
-class GameMode
-{
-    const Rounds = 0;
-    const TimeAttack = 1;
-    const Team = 2;
-    const Laps = 3;
-    const Stunts = 4;
-    const Cup = 5;
-}
-
-
-class ServerStatus
-{
-    const Waiting = 1;
-    const Launching = 2;
-    const Synchronization = 3;
-    const Play = 4;
-    const Finish = 5;
-}
-
-
-class SpectatorMode
-{
-    const UserSelectable = 0;
-    const Spectator = 1;
-    const Player = 2;
-}
-
-
-class CameraType
-{
-    const Unchanged = -1;
-    const Replay = 0;
-    const Follow = 1;
-    const Free = 2;
-}
-
-
-// For the Knockout
 
 class KnockoutMode
 {
@@ -2174,7 +2133,12 @@ function forcePlay($logins, $force)
             $multicall->forceSpectator($login, SpectatorMode::Player);
             if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
         }
-        return $multicall->submit();
+        $result = $multicall->submit();
+        $errors = array_filter(
+            $result,
+            function($el) { return isset($el['faultCode']) && isset($el['faultString']); }
+        );
+        return count($errors) === 0;
     }
     else
     {
@@ -2210,7 +2174,12 @@ function forceSpec($logins, $force)
             $multicall->forceSpectator($login, SpectatorMode::Spectator);
             if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
         }
-        return $multicall->submit();
+        $result = $multicall->submit();
+        $errors = array_filter(
+            $result,
+            function($el) { return isset($el['faultCode']) && isset($el['faultString']); }
+        );
+        return count($errors) === 0;
     }
     else
     {

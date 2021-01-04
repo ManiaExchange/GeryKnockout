@@ -213,7 +213,7 @@ interface TmForeverMethods
      * can be a single login or a list of comma-separated logins. Only available to Admin.
      *
      * @param string $text
-     * @param int $login
+     * @param string $login
      *
      * @return bool
      */

@@ -86,8 +86,8 @@ class SChallengeListInfo
     /** @var string $author */
     public $author;
 
-    /** @var string $environment */
-    public $environment;
+    /** @var string $environnement */
+    public $environnement;
 
     /** @var int $goldTime */
     public $goldTime;
@@ -101,7 +101,7 @@ class SChallengeListInfo
         $this->name = $array['Name'];
         $this->fileName = $array['FileName'];
         $this->author = $array['Author'];
-        $this->environment = $array['Environment'];
+        $this->environnement = $array['Environnement'];
         $this->goldTime = $array['GoldTime'];
         $this->copperPrice = $array['CopperPrice'];
     }
@@ -134,7 +134,7 @@ class SPlayerRanking
     /** @var int $nbrLapsFinished */
     public $nbrLapsFinished;
 
-    /** @var float $ladderScore */
+    /** @var int $ladderScore */
     public $ladderScore;
 
     public function __construct($array)
@@ -303,39 +303,116 @@ class Avatar extends GbxFile
 
 class SServerOptions
 {
-    /** @var string $ */
+    /** @var string $name */
     public $name;
 
+    /** @var string $comment */
     public $comment;
 
+    /** @var string $password */
     public $password;
 
+    /** @var string $passwordForSpectator */
     public $passwordForSpectator;
 
+    /** @var int $nextMaxPlayers */
     public $nextMaxPlayers;
 
+    /** @var int $nextMaxSpectators */
     public $nextMaxSpectators;
 
+    /** @var bool $isP2PUpload */
     public $isP2PUpload;
 
+    /** @var bool $isP2PDownload */
     public $isP2PDownload;
 
+    /** @var int $nextLadderMode */
     public $nextLadderMode;
 
+    /** @var int $nextVehicleNetQuality */
     public $nextVehicleNetQuality;
 
+    /** @var int $nextCallVoteTimeOut */
     public $nextCallVoteTimeOut;
 
+    /** @var float $callVoteRatio */
     public $callVoteRatio;
 
+    /** @var bool $allowChallengeDownload */
     public $allowChallengeDownload;
 
+    /** @var int $autoSaveReplays */
     public $autoSaveReplays;
 
+    /** @var string $refereePassword */
     public $refereePassword;
 
-    public
+    /** @var int $refereeMode */
+    public $refereeMode;
 
+    /** @var bool $autoSaveValidationReplays */
+    public $autoSaveValidationReplays;
+
+    /** @var int $hideServer */
+    public $hideServer;
+
+    /** @var bool $useChangingValidationSeed */
+    public $useChangingValidationSeed;
+
+    public function __construct($array)
+    {
+        $this->name = $array['Name'];
+        $this->comment = $array['Comment'];
+        $this->password = $array['Password'];
+        $this->passwordForSpectator = $array['PasswordForSpectator'];
+        $this->currentMaxPlayers = $array['CurrentMaxPlayers'];
+        $this->nextMaxPlayers = $array['NextMaxPlayers'];
+        $this->currentMaxSpectators = $array['CurrentMaxSpectators'];
+        $this->nextMaxSpectators = $array['NextMaxSpectators'];
+        $this->isP2PUpload = $array['IsP2PUpload'];
+        $this->isP2PDownload = $array['IsP2PDownload'];
+        $this->nextLadderMode = $array['NextLadderMode'];
+        $this->nextVehicleNetQuality = $array['NextVehicleNetQuality'];
+        $this->nextCallVoteTimeOut = $array['NextCallVoteTimeOut'];
+        $this->callVoteRatio = $array['CallVoteRatio'];
+        $this->allowChallengeDownload = $array['AllowChallengeDownload'];
+        $this->autoSaveReplays = $array['AutoSaveReplays'];
+        if (isset($array['RefereePassword'])) $this->refereePassword = $array['RefereePassword'];
+        if (isset($array['RefereeMode'])) $this->refereeMode = $array['RefereeMode'];
+        if (isset($array['AutoSaveValidationReplays'])) $this->autoSaveValidationReplays = $array['AutoSaveValidationReplays'];
+        if (isset($array['HideServer'])) $this->hideServer = $array['HideServer'];
+        if (isset($array['UseChangingValidationSeed'])) $this->useChangingValidationSeed = $array['UseChangingValidationSeed'];
+    }
+}
+
+
+class SServerOptionsInfo extends SServerOptions
+{
+    /** @var int $ */
+    public $currentMaxPlayers;
+
+    /** @var int $ */
+    public $currentMaxSpectators;
+
+    /** @var int $ */
+    public $currentLadderMode;
+
+    /** @var int $ */
+    public $currentVehicleNetQuality;
+
+    /** @var int $ */
+    public $currentCallVoteTimeOut;
+
+    public function __construct($array)
+    {
+        parent::__construct($array);
+        $this->currentMaxPlayers = $array['CurrentMaxPlayers'];
+        $this->currentMaxSpectators = $array['CurrentMaxSpectators'];
+        $this->currentLadderMode = $array['CurrentLadderMode'];
+        $this->currentVehicleNetQuality = $array['CurrentVehicleNetQuality'];
+        $this->currentCallVoteTimeOut = $array['CurrentCallVoteTimeOut'];
+    }
 }
 
 
@@ -392,7 +469,7 @@ abstract class RefereeMode
 }
 
 
-abstract class ServerState
+abstract class ServerStatus
 {
     const Waiting = 1;
     const Launching = 2;
@@ -402,7 +479,7 @@ abstract class ServerState
 }
 
 
-abstract class SpectatorStatus
+abstract class SpectatorMode
 {
     const UserSelectable = 0;
     const Spectator = 1;
