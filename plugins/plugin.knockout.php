@@ -4,8 +4,12 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
-const Version = '2.0.3 (beta)';
+const Version = '2.0.4 (beta)';
 const MinimumLogLevel = Log::Information;
+
+
+if (!isset($call)) $call = new GbxClient($client);
+if (!isset($multicall)) $multicall = new GbxClientMulticall($client);
 
 
 /**
@@ -327,112 +331,6 @@ class Actions
     const CliReferencePage3 = 513;
     const SpectatePlayer = 1024; // 1024-1279
     const SpectatePlayerMax = 1279;
-}
-
-
-/**
- * Utility class for client queries.
- *
- * Use this class as an instance for multicalling:
- *
- *     $queries = new QueryManager();
- *     $queries->add('ChatSendServerMessage', 'Hello world');
- *     $queries->add('ChatSendServerMessage', 'It's nice to be here');
- *     $queries->submit();
- *
- * or use its static methods for single queries:
- *
- *     QueryManager::query('ForceSpectator', 'voyager006', 0);
- *     $response = QueryManager::queryWithResponse('GetPlayerInfo', 'voyager006');
- */
-class QueryManager
-{
-    private $multicall;
-
-    /**
-     * Instantiates a query manager.
-     */
-    public function __construct()
-    {
-        $this->multicall = array();
-    }
-
-    private static function handleError($methodName = null)
-    {
-        global $client;
-
-        $subject = is_null($methodName) ? 'Client query' : "Client query {$methodName}";
-        $msg = sprintf("%s failed with code %d: %s", $subject, $client->getErrorCode(), $client->getErrorMessage());
-        Log::error($msg);
-        $client->resetError();
-    }
-
-    /**
-     * Adds a client query to memory.
-     *
-     * @param string $methodName The method name of the query.
-     * @param array ...$args [Optional] The arguments for the specified query.
-     */
-    public function add($methodName, $args = null)
-    {
-        $args = array_slice(func_get_args(), 1);
-        $this->multicall[] = array(
-            'methodName' => $methodName,
-            'params' => $args
-        );
-    }
-
-    /**
-     * Submits the in-memory queries to the client.
-     *
-     * @return bool True if the query was successfully sent, false if an error occurred or there are
-     * no queries to send.
-     */
-    public function submit()
-    {
-        global $client;
-
-        if (empty($this->multicall)) return false;
-
-        $success = $client->query('system.multicall', $this->multicall);
-        if (!$success) self::handleError();
-        $this->multicall = array();
-        return $success;
-    }
-
-    /**
-     * Queries the client.
-     *
-     * @param string $methodName The method name of the query.
-     * @param array ...$args [Optional] The arguments for the specified query.
-     *
-     * @return bool True if the query was successfully handled, false if an error occurred.
-     */
-    public static function query($methodName, $args = null)
-    {
-        global $client;
-
-        $success = call_user_func_array(array($client, 'query'), func_get_args());
-        if (!$success) self::handleError($methodName);
-        return $success;
-    }
-
-    /**
-     * Queries the client and returns its response.
-     *
-     * @param string $methodName The method name of the query.
-     * @param array ...$args [Optional] The arguments for the specified query.
-     *
-     * @return mixed|false The response from the client if the query was successfully handled, false
-     * if an error occurred.
-     */
-    public static function queryWithResponse($methodName, $args = null)
-    {
-        global $client;
-
-        $success = call_user_func_array(array(__CLASS__, 'query'), func_get_args());
-        return $success ? $client->getResponse() : false;
-    }
 }
 
 
@@ -762,16 +660,18 @@ class Chat
      */
     public static function write($message, $logins = null)
     {
+        global $call;
+
         $formatted = sprintf('%s>> %s', self::Prefix, $message);
         if (is_null($logins))
         {
-            QueryManager::query('ChatSendServerMessage', $formatted);
+            $call->chatSendServerMessage($formatted);
         }
         else
         {
             if (is_string($logins)) $logins = array($logins);
             $commaSeparatedLogins = implode(',', $logins);
-            QueryManager::query('ChatSendServerMessageToLogin', $formatted, $commaSeparatedLogins);
+            $call->chatSendServerMessageToLogin($formatted, $commaSeparatedLogins);
         }
     }
 
@@ -1514,16 +1414,17 @@ class UI
      */
     public static function updateStatusBar($knockoutState, $roundNb, $nbPlayers, $nbKOs, $players)
     {
+        global $multicall;
         Log::debug(sprintf('updateStatusBar %d %d %d %d', $knockoutState, $roundNb, $nbPlayers, $nbKOs));
+
         // Consider generating UIs four times, one for each player state, and apply them to each group of players
-        $queries = new QueryManager();
         foreach ($players as $player)
         {
             $login = $player['Login'];
             $xml = self::statusBarManialink($player['Status'], $knockoutState, $roundNb, $nbPlayers, $nbKOs);
-            $queries->add('SendDisplayManialinkPageToLogin', $login, $xml, 0, false);
+            $multicall->sendDisplayManialinkPageToLogin($login, $xml, 0, false);
         }
-        $queries->submit();
+        $multicall->submit();
     }
 
     /**
@@ -1534,16 +1435,18 @@ class UI
      */
     public static function hideStatusBar($logins = null)
     {
+        global $call;
+
         $manialink = '<manialink id="' . self::StatusBar . '"></manialink>';
         if (is_null($logins))
         {
-            QueryManager::query('SendDisplayManialinkPage', $manialink, 0, false);
+            $call->sendDisplayManialinkPage($manialink, 0, false);
         }
         else
         {
             if (is_string($logins)) $logins = array($logins);
             $commaSeparatedLogins = implode(',', $logins);
-            QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, false);
+            $call->sendDisplayManialinkPageToLogin($commaSeparatedLogins, $manialink, 0, false);
         }
     }
 
@@ -1703,17 +1606,19 @@ class UI
      */
     public static function updateScoreboard($scores, $gameMode, $numberOfKOs, $numberOfPlayers, $logins = null)
     {
+        global $call;
         Log::debug('updating scoreboard...');
+
         $manialink = self::scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers);
         if (is_null($logins))
         {
-            QueryManager::query('SendDisplayManialinkPage', $manialink, 0, false);
+            $call->sendDisplayManialinkPage($manialink, 0, false);
         }
         else
         {
             if (is_string($logins)) $logins = array($logins);
             $commaSeparatedLogins = implode(',', $logins);
-            QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, false);
+            $call->sendDisplayManialinkPageToLogin($commaSeparatedLogins, $manialink, 0, false);
         }
     }
 
@@ -1744,17 +1649,19 @@ class UI
      */
     public static function hideScoreboard($logins = null)
     {
+        global $call;
         Log::debug('hiding scoreboard...');
+
         $manialink = self::emptyScoreboardManialink();
         if (is_null($logins))
         {
-            QueryManager::query('SendDisplayManialinkPage', $manialink, 0, false);
+            $call->sendDisplayManialinkPage($manialink, 0, false);
         }
         else
         {
             if (is_string($logins)) $logins = array($logins);
             $commaSeparatedLogins = implode(',', $logins);
-            QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, false);
+            $call->sendDisplayManialinkPageToLogin($commaSeparatedLogins, $manialink, 0, false);
         }
     }
 
@@ -1763,7 +1670,9 @@ class UI
      */
     public static function restoreDefaultScoreboard()
     {
+        global $call;
         Log::debug('restoring default scoreboard...');
+
         $manialink = '
             <manialink id="' . self::Scoreboard . '"></manialink>
             <custom_ui>
@@ -1776,7 +1685,7 @@ class UI
                 <global visible="true"/>
             </custom_ui>
         ';
-        QueryManager::query('SendDisplayManialinkPage', $manialink, 0, false);
+        $call->sendDisplayManialinkPage($manialink, 0, false);
     }
 
     /**
@@ -1788,6 +1697,8 @@ class UI
      */
     public static function showInfoDialog($text, $logins)
     {
+        global $call;
+
         $manialink = '
             <manialink id="' . self::Dialog . '">
                 <format style="TextRaceChat" textsize="1.0" />
@@ -1800,7 +1711,7 @@ class UI
         ';
         if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
-        QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
+        $call->sendDisplayManialinkPageToLogin($commaSeparatedLogins, $manialink, 0, true);
     }
 
     /**
@@ -1818,6 +1729,8 @@ class UI
      */
     public static function showMultiPageDialog($text, $logins, $currentPageNumber, $totalPages, $prevPageActionId = null, $nextPageActionId = null)
     {
+        global $call;
+
         $prevPage = is_null($prevPageActionId)
             ? '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="StarGold" />'
             : '<quad posn="1.5 0 1" sizen="3 3" halign="center" valign="center" style="Icons64x64_1" substyle="ArrowPrev" action="' . $prevPageActionId . '" />';
@@ -1842,7 +1755,7 @@ class UI
         ';
         if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
-        QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
+        $call->sendDisplayManialinkPageToLogin($commaSeparatedLogins, $manialink, 0, true);
     }
 
     /**
@@ -1856,6 +1769,8 @@ class UI
      */
     public static function showPrompt($text, $actionId, $logins)
     {
+        global $call;
+
         $nbLines = substr_count($text, "\n") + 1;
         $textboxHeight = $nbLines * 2.5;
         $print = function($value) { return sprintf('%1.1f', $value); };
@@ -1872,7 +1787,7 @@ class UI
         ';
         if (is_string($logins)) $logins = array($logins);
         $commaSeparatedLogins = implode(',', $logins);
-        QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, 0, true);
+        $call->sendDisplayManialinkPageToLogin($commaSeparatedLogins, $manialink, 0, true);
     }
 
     /**
@@ -1887,6 +1802,8 @@ class UI
      */
     public static function showMessage($text, $timeout, $logins = null)
     {
+        global $call;
+
         $nbLines = substr_count($text, "\n") + 1;
         $textboxHeight = $nbLines * 2.5;
         $print = function($value) { return sprintf('%1.1f', $value); };
@@ -1901,13 +1818,13 @@ class UI
         ';
         if (is_null($logins))
         {
-            QueryManager::query('SendDisplayManialinkPage', $manialink, $timeout * 1000, true);
+            $call->sendDisplayManialinkPage($manialink, $timeout * 1000, true);
         }
         else
         {
             if (is_string($logins)) $logins = array($logins);
             $commaSeparatedLogins = implode(',', $logins);
-            QueryManager::query('SendDisplayManialinkPageToLogin', $commaSeparatedLogins, $manialink, $timeout * 1000, true);
+            $call->sendDisplayManialinkPageToLogin($commaSeparatedLogins, $manialink, $timeout * 1000, true);
         }
     }
 }
@@ -2242,6 +2159,8 @@ function hasHudOn($login)
  */
 function forcePlay($logins, $force)
 {
+    global $multicall;
+
     if (is_string($logins)) $logins = array($logins);
     if (count($logins) > 0)
     {
@@ -2250,13 +2169,12 @@ function forcePlay($logins, $force)
             $force ? 'ForcePlay' : 'UserSelectable',
             print_r($logins, true)
         ));
-        $queries = new QueryManager();
         foreach ($logins as $login)
         {
-            $queries->add('ForceSpectator', $login, SpectatorMode::Player);
-            if (!$force) $queries->add('ForceSpectator', $login, SpectatorMode::UserSelectable);
+            $multicall->forceSpectator($login, SpectatorMode::Player);
+            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
         }
-        return $queries->submit();
+        return $multicall->submit();
     }
     else
     {
@@ -2277,6 +2195,8 @@ function forcePlay($logins, $force)
  */
 function forceSpec($logins, $force)
 {
+    global $multicall;
+
     if (is_string($logins)) $logins = array($logins);
     if (count($logins) > 0)
     {
@@ -2285,13 +2205,12 @@ function forceSpec($logins, $force)
             $force ? 'ForceSpec' : 'UserSelectable',
             print_r($logins, true)
         ));
-        $queries = new QueryManager();
         foreach ($logins as $login)
         {
-            $queries->add('ForceSpectator', $login, SpectatorMode::Spectator);
-            if (!$force) $queries->add('ForceSpectator', $login, SpectatorMode::UserSelectable);
+            $multicall->forceSpectator($login, SpectatorMode::Spectator);
+            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
         }
-        return $queries->submit();
+        return $multicall->submit();
     }
     else
     {
@@ -2431,20 +2350,21 @@ class KnockoutRuntime
         global $PlayerList;
         global $RoundCustomPoints;
         global $CustomPoints;
+        global $call;
 
-        $this->isWarmup = QueryManager::queryWithResponse('GetWarmUp');
-        $status = QueryManager::queryWithResponse('GetStatus');
+        $this->isWarmup = $call->getWarmUp();
+        $status = $call->getStatus();
         $this->isPodium = !$this->isWarmup && $status['Code'] === ServerStatus::Finish;
-        $this->gameMode = QueryManager::queryWithResponse('GetGameMode');
+        $this->gameMode = $call->getGameMode();
 
         // In case the plugin crashed mid-KO
         UI::hideStatusBar();
         UI::restoreDefaultScoreboard();
         forcePlay(logins($PlayerList), false);
-        $timeout = QueryManager::queryWithResponse('GetCallVoteTimeOut');
+        $timeout = $call->getCallVoteTimeOut();
         if ($timeout['CurrentValue'] === 0)
         {
-            QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
+            $call->setCallVoteTimeOut($this->defaultVoteTimeout);
         }
         if ($RoundCustomPoints === 1)
         {
@@ -2614,6 +2534,8 @@ class KnockoutRuntime
      */
     private function adjustPoints()
     {
+        global $call;
+
         $playerCount = count($this->playerList->getPlaying());
         $nbKOs = $this->kosThisRound;
         $numberOfSurvivors = $playerCount <= 1 ? 1 : $playerCount - $nbKOs;
@@ -2622,7 +2544,7 @@ class KnockoutRuntime
             array(0)
         );
         // Needs to have at least two elements
-        QueryManager::query('SetRoundCustomPoints', $scoresPartition);
+        $call->setRoundCustomPoints($scoresPartition);
     }
 
     /**
@@ -2633,7 +2555,9 @@ class KnockoutRuntime
      */
     private function start($players, $now = false)
     {
-        QueryManager::query('SetCallVoteTimeOut', 0);
+        global $call;
+
+        $call->setCallVoteTimeout(0);
         $this->playerList->addAll($players, PlayerStatus::Playing, $this->lives);
         forcePlay(logins($this->playerList->getAll()), true);
         if ($now)
@@ -2646,7 +2570,7 @@ class KnockoutRuntime
             }
             else
             {
-                QueryManager::query('NextChallenge');
+                $call->nextChallenge();
             }
         }
         elseif ($this->isPodium)
@@ -2664,6 +2588,8 @@ class KnockoutRuntime
 
     private function stop()
     {
+        global $call;
+
         $this->roundNumber = 0;
         UI::hideStatusBar();
         UI::hideScoreboard();
@@ -2674,8 +2600,8 @@ class KnockoutRuntime
         forcePlay(logins($this->playerList->getAll()), false);
         $this->playerList->reset();
         $this->scores->reset();
-        QueryManager::query('SetCallVoteTimeOut', $this->defaultVoteTimeout);
-        QueryManager::query('SetRoundCustomPoints', $this->defaultPointPartition);
+        $call->setCallVoteTimeOut($this->defaultVoteTimeout);
+        $call->setRoundCustomPoints($this->defaultPointPartition);
         $this->koStatus = KnockoutStatus::Idle;
     }
 
@@ -2989,8 +2915,10 @@ class KnockoutRuntime
      */
     private function replaceNextTrackIfNeeded()
     {
+        global $call;
+
         $nbSkips = 0;
-        $nextChallenge = QueryManager::queryWithResponse('GetNextChallengeInfo');
+        $nextChallenge = $call->getNextChallengeInfo();
         $authorIsStillIn = $this->playerList->hasStatus($nextChallenge['Author'], PlayerStatus::Playing);
         $maxSkips = $this->authorSkipLimit;
 
@@ -2999,8 +2927,7 @@ class KnockoutRuntime
             $nextAuthor = $this->playerList->get($nextChallenge['Author']);
             // 'NextChallenge' has no effect once we're in the podium, so we'll do a dirty hack
             // instead and shift the index that points to the upcoming track
-            $nextChallengeIndex = QueryManager::queryWithResponse('GetNextChallengeIndex');
-            QueryManager::query('SetNextChallengeIndex', $nextChallengeIndex + 1);
+            $call->setNextChallengeIndex($call->getNextChallengeIndex() + 1);
             $nbSkips++;
             Chat::info(sprintf(
                 'Skipping $x%s$z as $x%s$z is still participating (%d/%d)',
@@ -3010,7 +2937,7 @@ class KnockoutRuntime
                 $maxSkips
             ));
             // Then we can grab the challenge coming after that and check the author again
-            $nextChallenge = QueryManager::queryWithResponse('GetNextChallengeInfo');
+            $nextChallenge = $call->getNextChallengeInfo();
             $authorIsStillIn = $this->playerList->hasStatus($nextChallenge['Author'], PlayerStatus::Playing);
         }
     }
@@ -3089,7 +3016,9 @@ class KnockoutRuntime
      */
     private function skipWarmup()
     {
-        QueryManager::query('SetWarmUp', false);
+        global $call;
+
+        $call->setWarmUp(false);
     }
 
     /**
@@ -3097,6 +3026,8 @@ class KnockoutRuntime
      */
     private function restartRound()
     {
+        global $call;
+
         // If we're in Rounds, we gotta make sure that we can restart the round. The default
         // behaviour is:
         // - 'RestartChallenge':
@@ -3111,7 +3042,7 @@ class KnockoutRuntime
             case GameMode::Stunts:
             case GameMode::TimeAttack:
                 // No way to restart without warmup if settings have changed
-                QueryManager::query('RestartChallenge');
+                $call->restartChallenge();
                 break;
 
             case GameMode::Cup:
@@ -3124,12 +3055,12 @@ class KnockoutRuntime
                 {
                     // If someone have finished, the only way to restart the round (without points
                     // being applied) is to start from round 1
-                    if ($this->gameMode === GameMode::Cup) QueryManager::query('RestartChallenge', true);
-                    else QueryManager::query('RestartChallenge');
+                    if ($this->gameMode === GameMode::Cup) $call->restartChallenge(true);
+                    else $call->restartChallenge();
                 }
                 else
                 {
-                    QueryManager::query('ForceEndRound');
+                    $call->forceEndRound();
                 }
                 break;
         }
@@ -3140,15 +3071,20 @@ class KnockoutRuntime
      */
     private function restartTrack()
     {
+        global $call;
+        global $multicall;
+
         // Changing some setting that takes effect on next challenge (like
         // setting a new game mode) makes RestartChallenge restart the whole
         // challenge, including warmup
-        $chattime = QueryManager::queryWithResponse('GetChatTime');
-        QueryManager::query('SetChatTime', 0);
-        QueryManager::query('SetGameMode', GameMode::Team);
-        QueryManager::query('SetGameMode', $this->gameMode);
-        QueryManager::query('RestartChallenge');
-        QueryManager::query('SetChatTime', $chattime['NextValue']);
+        $chattime = $call->getChatTime();
+        $multicall
+            ->setChatTime(0)
+            ->setGameMode(GameMode::Team)
+            ->setGameMode($this->gameMode)
+            ->restartChallenge()
+            ->setChatTime($chattime['NextValue'])
+            ->submit();
     }
 
     /**
@@ -3172,6 +3108,7 @@ class KnockoutRuntime
      */
     public function onStatusChange($args)
     {
+        global $call;
         Log::debug(sprintf('onStatusChange %s', implode(' ', $args)));
 
         switch ($args[0])
@@ -3179,13 +3116,13 @@ class KnockoutRuntime
             case ServerStatus::Launching:
                 $this->isPodium = false;
                 $this->onTrackChange();
-                $this->gameMode = QueryManager::queryWithResponse('GetGameMode');
+                $this->gameMode = $call->getGameMode();
                 $this->reflectScoringWithGameMode();
                 break;
 
             case ServerStatus::Synchronization:
                 $this->isPodium = false;
-                $this->isWarmup = QueryManager::queryWithResponse('GetWarmUp');
+                $this->isWarmup = $call->getWarmUp();
                 if ($this->koStatus !== KnockoutStatus::Idle && $this->koStatus !== KnockoutStatus::Tiebreaker)
                 {
                     $this->koStatus = $this->isWarmup ? KnockoutStatus::Warmup : KnockoutStatus::Running;
@@ -3275,13 +3212,14 @@ class KnockoutRuntime
      */
     public function onBeginRound()
     {
+        global $call;
         Log::debug('onBeginRound');
 
         if ($this->koStatus !== KnockoutStatus::Idle)
         {
             if ($this->koStatus === KnockoutStatus::StartingNow)
             {
-                QueryManager::query('NextChallenge');
+                $call->nextChallenge();
             }
             else
             {
@@ -3297,11 +3235,11 @@ class KnockoutRuntime
                 }
                 elseif ($this->koStatus === KnockoutStatus::SkippingWarmup)
                 {
-                    QueryManager::query('ForceEndRound');
+                    $call->forceEndRound();
                 }
                 elseif ($this->koStatus === KnockoutStatus::SkippingTrack)
                 {
-                    QueryManager::query('NextChallenge');
+                    $call->nextChallenge();
                 }
             }
         }
@@ -3352,12 +3290,14 @@ class KnockoutRuntime
      */
     public function onPlayerConnect($args)
     {
+        global $call;
         Log::debug(sprintf('onPlayerConnect %s', implode(' ', $args)));
+
         if ($this->koStatus === KnockoutStatus::Idle) return;
 
         $login = $args[0];
         $joinsAsSpectator = $args[1];
-        $playerInfo = QueryManager::queryWithResponse('GetPlayerInfo', $login);
+        $playerInfo = $call->getPlayerInfo($login, StructVersion::Forever);
         $didJoin = false;
         $didRejoin = false;
         // Only disconnected players who are eligible to rejoin should be matched here; see
@@ -3534,6 +3474,7 @@ class KnockoutRuntime
      */
     public function onPlayerFinish($args)
     {
+        global $call;
         Log::debug(sprintf('onPlayerFinish %s', implode(' ', $args)));
 
         $login = $args[1];
@@ -3571,7 +3512,7 @@ class KnockoutRuntime
                         {
                             $this->koStatus = KnockoutStatus::RestartingRound;
                             $this->falseStartCount++;
-                            QueryManager::query('ForceEndRound');
+                            $call->forceEndRound();
                             $text = "False start! Restarting the round... ({$this->falseStartCount}/{$this->maxFalseStarts})";
                             Chat::info($text);
                             UI::showMessage($text, 5);
@@ -3909,6 +3850,8 @@ class KnockoutRuntime
      */
     private function cliStart($args, $onError, $issuerLogin)
     {
+        global $call;
+
         if ($this->koStatus !== KnockoutStatus::Idle)
         {
             $onError('There is already a knockout in progress');
@@ -3919,8 +3862,8 @@ class KnockoutRuntime
         }
         elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
         {
-            $mode = QueryManager::queryWithResponse('GetGameMode');
-            $players = QueryManager::queryWithResponse('GetPlayerList', 255, 0, 1);
+            $mode = $call->getGameMode();
+            $players = $call->getPlayerList(255, 0, StructVersion::Forever);
             if ($mode === GameMode::Team)
             {
                 $onError('Knockout does not work in Team mode');
@@ -3975,6 +3918,8 @@ class KnockoutRuntime
      */
     private function cliSkip($args, $onError)
     {
+        global $call;
+
         if ($this->koStatus === KnockoutStatus::Idle)
         {
             $onError('The knockout must be running before this command can be used');
@@ -3994,7 +3939,7 @@ class KnockoutRuntime
                 $this->koStatus = KnockoutStatus::SkippingTrack;
                 $this->updateStatusBar();
             }
-            QueryManager::query('NextChallenge');
+            $call->nextChallenge();
             Chat::info('Skipping the current track');
         }
         elseif (strtolower($args[1]) === 'warmup')
@@ -5112,6 +5057,7 @@ class KnockoutRuntime
     public function playerManialinkPageAnswer($args)
     {
         global $PlayerScript;
+        global $call;
         Log::debug(sprintf('playerManialinkPageAnswer %s', implode(' ', $args)));
 
         $playerId = $args[0];
@@ -5166,8 +5112,8 @@ class KnockoutRuntime
                 if ($manialinkId >= Actions::SpectatePlayer && $manialinkId <= Actions::SpectatePlayerMax)
                 {
                     // Manialink ID is encoded with the target playerID (Manialink ID + Player ID)
-                    $target = $manialinkId - Actions::SpectatePlayer;
-                    QueryManager::query('ForceSpectatorTargetId', $playerId, $target, CameraType::Unchanged);
+                    $targetId = $manialinkId - Actions::SpectatePlayer;
+                    $call->forceSpectatorTargetId($playerId, $targetId, CameraType::Unchanged);
                 }
                 break;
         }
@@ -5184,11 +5130,13 @@ class KnockoutRuntime
      */
     public function testChatCommand($args, $issuer)
     {
+        global $call;
+
         $login = $issuer[0];
         if (isadmin($login))
         {
-            if ($args[0]) QueryManager::query('SetWarmUp', true);
-            else QueryManager::query('SetWarmUp', false);
+            if ($args[0]) $call->setWarmUp(true);
+            else $call->setWarmUp(false);
             Chat::info2('test done', $login);
         }
         else

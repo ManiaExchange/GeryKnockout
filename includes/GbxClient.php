@@ -1626,7 +1626,7 @@ interface TmForeverMethods
      *
      * @return bool
      */
-    public function setRoundCustomPoints($points, $relaxConstraints);
+    public function setRoundCustomPoints($points, $relaxConstraints = null);
 
     /**
      * Gets the points used for the scores in rounds mode.
@@ -2180,7 +2180,7 @@ interface TmForeverMethods
      *
      * @return bool
      */
-    public function forceSpectatorTargetId($spectatorLogin, $targetLogin, $cameraType);
+    public function forceSpectatorTargetId($spectatorId, $targetId, $cameraType);
 
     /**
      * Pass the login of the spectator. A spectator that once was a player keeps his player slot, so
@@ -3225,7 +3225,7 @@ class GbxClient extends ClientLogging implements TmForeverMethods
         return $this->query('GetRoundPointsLimit');
     }
 
-    public function setRoundCustomPoints($points, $relaxConstraints)
+    public function setRoundCustomPoints($points, $relaxConstraints = null)
     {
         return $this->query('SetRoundCustomPoints', $points, $relaxConstraints);
     }
@@ -3475,9 +3475,9 @@ class GbxClient extends ClientLogging implements TmForeverMethods
         return $this->query('ForceSpectatorTarget', $spectatorLogin, $targetLogin, $cameraType);
     }
 
-    public function forceSpectatorTargetId($spectatorLogin, $targetLogin, $cameraType)
+    public function forceSpectatorTargetId($spectatorId, $targetId, $cameraType)
     {
-        return $this->query('ForceSpectatorTargetId', $spectatorLogin, $targetLogin, $cameraType);
+        return $this->query('ForceSpectatorTargetId', $spectatorId, $targetId, $cameraType);
     }
 
     public function spectatorReleasePlayerSlot($login)
@@ -5085,7 +5085,7 @@ class GbxClientMulticall extends ClientLogging implements TmForeverMethods
     /**
      * @return $this This object, for chaining.
      */
-    public function setRoundCustomPoints($points, $relaxConstraints)
+    public function setRoundCustomPoints($points, $relaxConstraints = null)
     {
         $this->addCall('SetRoundCustomPoints', $points, $relaxConstraints);
         return $this;
@@ -5535,9 +5535,9 @@ class GbxClientMulticall extends ClientLogging implements TmForeverMethods
     /**
      * @return $this This object, for chaining.
      */
-    public function forceSpectatorTargetId($spectatorLogin, $targetLogin, $cameraType)
+    public function forceSpectatorTargetId($spectatorId, $targetId, $cameraType)
     {
-        $this->addCall('ForceSpectatorTargetId', $spectatorLogin, $targetLogin, $cameraType);
+        $this->addCall('ForceSpectatorTargetId', $spectatorId, $targetId, $cameraType);
         return $this;
     }
 
