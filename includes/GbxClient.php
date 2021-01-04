@@ -698,7 +698,7 @@ interface TmForeverMethods
      *
      * @return bool
      */
-    public function echo($param1, $param2);
+    public function echoInvoke($param1, $param2);
 
     /**
      * Ignore the player with the specified login. Only available to Admin.
@@ -2733,7 +2733,7 @@ class GbxClient extends ClientLogging implements TmForeverMethods
         return $this->query('TunnelSendDataToLogin', $fileName, $data);
     }
 
-    public function echo($param1, $param2)
+    public function echoInvoke($param1, $param2)
     {
         return $this->query('Echo', $param1, $param2);
     }
@@ -4201,7 +4201,7 @@ class GbxClientMulticall extends ClientLogging implements TmForeverMethods
     /**
      * @return $this This object, for chaining.
      */
-    public function echo($param1, $param2)
+    public function echoInvoke($param1, $param2)
     {
         $this->addCall('Echo', $param1, $param2);
         return $this;

@@ -8,11 +8,6 @@ const Version = '2.1.0 (beta)';
 const MinimumLogLevel = Log::Information;
 
 
-global $client;
-if (!isset($call)) $call = new GbxClient($client);
-if (!isset($multicall)) $multicall = new GbxClientMulticall($client);
-
-
 /**
  * Obtains the names and values of constants through the Reflection API.
  *
@@ -2327,10 +2322,9 @@ class KnockoutRuntime
 
         $this->isWarmup = $call->getWarmUp();
         $status = $call->getStatus();
+        $this->serverStatus = $status['Code'];
         $this->isPodium = !$this->isWarmup && $status['Code'] === ServerStatus::Finish;
         $this->gameMode = $call->getGameMode();
-        $status = $call->getStatus();
-        $this->serverStatus = $status[0];
 
         // In case the plugin crashed mid-KO
         UI::hideStatusBar();
@@ -3472,17 +3466,17 @@ class KnockoutRuntime
 
             case KnockoutStatus::Running:
             case KnockoutStatus::Tiebreaker:
-                // Check if it's the first player to retire and whether a false start
-                // can be considered
+                // Check if it's the first player to retire and whether a false start can be
+                // considered
                 if ($this->shouldCheckForFalseStarts
                     && $this->gameMode !== GameMode::Stunts
                     && $this->gameMode !== GameMode::TimeAttack
                     && $timeOrScore === 0
                     && $this->falseStartCount < $this->maxFalseStarts)
                 {
-                    // Must be within 1 second of the start of the round
+                    // Must be within 2.5 seconds of the start of the round
                     $currentTime = microtime(true);
-                    if ($currentTime - $this->roundStartTime <= 1.)
+                    if ($currentTime - $this->roundStartTime <= 2.5)
                     {
                         // Must be a player in the knockout who retires
                         if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
