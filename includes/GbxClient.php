@@ -2366,8 +2366,6 @@ class GbxClient extends ClientLogging implements TmForeverMethods
     private function query($args)
     {
         $success = call_user_func_array(array($this->client, 'query'), func_get_args());
-        // $success = call_user_func_array($this->client->query, func_get_args());
-        // $success = call_user_func_array('$this->client->query', func_get_args());
         if ($success)
         {
             return $this->client->getResponse();

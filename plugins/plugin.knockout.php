@@ -3054,9 +3054,8 @@ class KnockoutRuntime
         global $call;
         global $multicall;
 
-        // Changing some setting that takes effect on next challenge (like
-        // setting a new game mode) makes RestartChallenge restart the whole
-        // challenge, including warmup
+        // Changing some setting that takes effect on next challenge (like setting a new game mode)
+        // makes RestartChallenge restart the whole challenge, including warmup
         $chattime = $call->getChatTime();
         $multicall
             ->setChatTime(0)
@@ -3070,8 +3069,8 @@ class KnockoutRuntime
     /**
      * Callback method for when the server changes its status.
      *
-     * Throughout a challenge, the server goes through a lifecycle represented
-     * through the following statuses:
+     * Throughout a challenge, the server goes through a lifecycle represented through the following
+     * statuses:
      *
      * - 1: Waiting
      * - 2: Launching
@@ -3088,48 +3087,11 @@ class KnockoutRuntime
      */
     public function onStatusChange($args)
     {
-        global $call;
         Log::debug(sprintf('onStatusChange %s', implode(' ', $args)));
+
         $this->serverStatus = $args[0];
-
-        switch ($args[0])
-        {
-            case ServerStatus::Launching:
-                $this->isPodium = false;
-                $this->onTrackChange();
-                $this->gameMode = $call->getGameMode();
-                $this->reflectScoringWithGameMode();
-                break;
-
-            case ServerStatus::Synchronization:
-                $this->isPodium = false;
-                $this->isWarmup = $call->getWarmUp();
-                if ($this->koStatus !== KnockoutStatus::Idle && $this->koStatus !== KnockoutStatus::Tiebreaker)
-                {
-                    $this->koStatus = $this->isWarmup ? KnockoutStatus::Warmup : KnockoutStatus::Running;
-                    $this->roundNumber++;
-                }
-                $this->onBeginSynchronization();
-                break;
-
-            case ServerStatus::Play:
-                if ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
-                {
-                    if ($this->gameMode === GameMode::Stunts || $this->gameMode === GameMode::TimeAttack)
-                    {
-                        $this->scores->initialize($this->playerList->getPlaying());
-                    }
-                    else
-                    {
-                        $this->shouldCheckForFalseStarts = true;
-                        $this->roundStartTime = microtime(true);
-                    }
-                }
-                break;
-
-            case ServerStatus::Finish:
-                break;
-        }
+        // Call callback method explicitly as it's not an event supported by TMGery/plugin manager
+        if ($args[0] === ServerStatus::Synchronization) $this->onBeginSynchronization();
     }
 
     /**
@@ -3145,16 +3107,27 @@ class KnockoutRuntime
      */
     public function onBeginRace($args)
     {
+        global $call;
+
         Log::debug(sprintf('onBeginRace %s', implode(' ', $args[0])));
-        // Note: round number and warmup status is not reflected at this point
+
+        $this->isPodium = false;
+        $this->onTrackChange();
+        $this->gameMode = $call->getGameMode();
+        $this->reflectScoringWithGameMode();
     }
 
     /**
-     * "Callback method" for when the synchronization phase (before each round) starts.
+     * Callback method for when the synchronization phase (before each round) starts.
      */
     public function onBeginSynchronization()
     {
+        global $call;
+
         Log::debug('onBeginSynchronization');
+
+        $this->isPodium = false;
+        $this->isWarmup = $call->getWarmUp();
 
         if ($this->koStatus === KnockoutStatus::Idle)
         {
@@ -3185,6 +3158,11 @@ class KnockoutRuntime
                     }
                 }
             }
+            else
+            {
+                $this->koStatus = $this->isWarmup ? KnockoutStatus::Warmup : KnockoutStatus::Running;
+                $this->roundNumber++;
+            }
             $this->announceRoundInChat();
             $this->updateKoCount();
             $this->updateStatusBar();
@@ -3198,6 +3176,7 @@ class KnockoutRuntime
     public function onBeginRound()
     {
         global $call;
+
         Log::debug('onBeginRound');
 
         if ($this->koStatus !== KnockoutStatus::Idle)
@@ -3226,6 +3205,19 @@ class KnockoutRuntime
                 {
                     $call->nextChallenge();
                 }
+            }
+        }
+
+        if ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
+        {
+            if ($this->gameMode === GameMode::Stunts || $this->gameMode === GameMode::TimeAttack)
+            {
+                $this->scores->initialize($this->playerList->getPlaying());
+            }
+            else
+            {
+                $this->shouldCheckForFalseStarts = true;
+                $this->roundStartTime = microtime(true);
             }
         }
     }
