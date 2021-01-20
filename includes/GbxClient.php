@@ -2318,28 +2318,21 @@ abstract class ClientLogging
 
     protected function logError($methodName)
     {
-        print("Query method {$methodName} failed with code {$this->client->getErrorCode()}: {$this->client->getErrorMessage()}");
+        print("Query method {$methodName} failed with code {$this->client->getErrorCode()}: {$this->client->getErrorMessage()}\n");
         $this->client->resetError();
     }
 
-    protected function logMulticallErrors($calls, $results)
+    protected function logMulticallErrors($calls, $errors)
     {
-        if (is_array($results))
+        $length = count($errors);
+        for ($i = 0; $i < $length; $i++)
         {
-            $length = count($results);
-            for ($i = 0; $i < $length; $i++)
+            $result = $errors[$i];
+            if (isset($result['faultCode']) && isset($result['faultString']))
             {
-                $result = $results[$i];
-                if (isset($result['faultCode']) && isset($result['faultString']))
-                {
-                    $methodName = $calls[$i]['methodName'];
-                    print("Multicall method {$methodName} failed with code {$result['faultCode']}: {$result['faultString']}");
-                }
+                $methodName = $calls[$i]['methodName'];
+                print("Multicall method {$methodName} failed with code {$result['faultCode']}: {$result['faultString']}\n");
             }
-        }
-        elseif ($results === false)
-        {
-            $this->logError('system.multicall');
         }
     }
 }
@@ -2363,7 +2356,7 @@ class GbxClient extends ClientLogging implements TmForeverMethods
         $this->client = $client;
     }
 
-    private function query($args)
+    protected function query()
     {
         $success = call_user_func_array(array($this->client, 'query'), func_get_args());
         if ($success)
@@ -2373,7 +2366,7 @@ class GbxClient extends ClientLogging implements TmForeverMethods
         else
         {
             $this->logError(func_get_arg(0));
-            return false;
+            return null;
         }
     }
 
@@ -3573,9 +3566,19 @@ class GbxClientMulticall extends ClientLogging implements TmForeverMethods
         $this->client = $client;
     }
 
-    private function addCall()
+    protected function filterMulticallErrors($result)
     {
-        call_user_func_array(array($this->client, 'addCall'), func_get_args());
+        return array_filter($result, function($item)
+        {
+            return isset($item['faultCode']) && isset($item['faultString']);
+        });
+    }
+
+    protected function addCall()
+    {
+        $args = func_get_args();
+        $methodName = array_shift($args);
+        $this->client->addCall($methodName, $args);
         return $this;
     }
 
@@ -3585,14 +3588,24 @@ class GbxClientMulticall extends ClientLogging implements TmForeverMethods
      * Each result will either be a single-item array containing the result value, or a struct of
      * the form {'faultCode': int, 'faultString': string}.
      *
-     * @return array
+     * @return array|bool|int
      */
     public function submit()
     {
         $calls = $this->client->calls;
-        $result = $this->client->multiquery();
-        $this->logMulticallErrors($calls, $result);
-        return $result;
+        $success = $this->client->multiquery();
+        if ($success)
+        {
+            $result = $this->client->getResponse();
+            $errors = $this->filterMulticallErrors($result);
+            $this->logMulticallErrors($calls, $errors);
+            return $result;
+        }
+        else
+        {
+            $this->logError('system.multicall');
+            return false;
+        }
     }
 
     /**
