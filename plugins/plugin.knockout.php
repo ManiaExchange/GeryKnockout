@@ -2701,7 +2701,10 @@ class KnockoutRuntime
             array_fill(0, $numberOfSurvivors, 1),
             array(0)
         );
-        $gbxclient->setRoundCustomPoints($scoresPartition);
+        // The game will complain if the number of elements in the scores partition exceed the
+        // number of players on the server (which can happen due to the trailing 0). Relaxing the
+        // constraints circumvents this.
+        $gbxclient->setRoundCustomPoints($scoresPartition, true);
     }
 
     /**
