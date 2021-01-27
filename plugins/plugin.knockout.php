@@ -4,12 +4,13 @@
  * Dynamic KO multiplier algorithm by Solux.
  * Based on original plugin by CavalierDeVache. Idea by Mikey.
  */
+namespace Knockout;
+
 require_once 'includes/GbxClient.php';
 require_once 'includes/GbxStructs.php';
 
-
-const KnockoutVersion = '2.1.0 (beta)';
-const KnockoutMinimumLogLevel = Log::Information;
+const Version = '3.0.0 (beta)';
+const MinimumLogLevel = Log::Information;
 
 
 /**
@@ -22,7 +23,7 @@ const KnockoutMinimumLogLevel = Log::Information;
  */
 function getConstants($className)
 {
-    $fooClass = new ReflectionClass($className);
+    $fooClass = new \ReflectionClass($className);
     return $fooClass->getConstants();
 }
 
@@ -38,7 +39,7 @@ function getConstants($className)
  */
 function getNameOfConstant($value, $className)
 {
-    return array_search($value, getConstants($className), true);
+    return array_search($value, getConstants(__NAMESPACE__.'\\'.$className), true);
 }
 
 
@@ -241,7 +242,7 @@ class Log
      */
     public static function debug($message)
     {
-        if (KnockoutMinimumLogLevel <= self::Debug) self::write('DBG', $message);
+        if (MinimumLogLevel <= self::Debug) self::write('DBG', $message);
     }
 
     /**
@@ -251,7 +252,7 @@ class Log
      */
     public static function information($message)
     {
-        if (KnockoutMinimumLogLevel <= self::Information) self::write('INF', $message);
+        if (MinimumLogLevel <= self::Information) self::write('INF', $message);
     }
 
     /**
@@ -261,7 +262,7 @@ class Log
      */
     public static function warning($message)
     {
-        if (KnockoutMinimumLogLevel <= self::Warning) self::write('WRN', $message);
+        if (MinimumLogLevel <= self::Warning) self::write('WRN', $message);
     }
 
     /**
@@ -271,7 +272,7 @@ class Log
      */
     public static function error($message)
     {
-        if (KnockoutMinimumLogLevel <= self::Error) self::write('ERR', $message);
+        if (MinimumLogLevel <= self::Error) self::write('ERR', $message);
     }
 }
 
@@ -292,70 +293,6 @@ class Actions
 }
 
 
-// if (!class_exists('Client'))
-// {
-//     class Client extends GbxClient
-//     {
-//         public function __construct()
-//         {
-//             global $client;
-
-//             $this->client = $client;
-//         }
-//     }
-// }
-
-
-// if (!class_exists('Multicall'))
-// {
-//     class Multicall extends GbxClientMulticall
-//     {
-//         protected $calls;
-
-//         public function __construct()
-//         {
-//             global $client;
-
-//             $this->client = $client;
-//             $this->calls = array();
-//         }
-
-//         protected function addCall()
-//         {
-//             $args = func_get_args();
-//             $methodName = array_shift($args);
-//             $this->calls[] = array('methodName' => $methodName, 'params' => $args);
-//             return $this;
-//         }
-
-//         public function submit()
-//         {
-//             $calls = $this->calls;
-//             $success = $this->client->query('system.multicall', $calls);
-//             $this->calls = array();
-//             if ($success)
-//             {
-//                 $result = $this->client->getResponse();
-//                 $errors = $this->filterMulticallErrors($result);
-//                 $this->logMulticallErrors($calls, $errors);
-//                 return $result;
-//             }
-//             else
-//             {
-//                 $this->logError('system.multicall');
-//                 return false;
-//             }
-//         }
-//     }
-// }
-
-
-// function isMulticallError($resultItem)
-// {
-//     return isset($resultItem['faultCode']) && isset($resultItem['faultString']);
-// }
-
-
 function filterMulticallErrors($result)
 {
     return array_filter($result, function($item)
@@ -363,116 +300,6 @@ function filterMulticallErrors($result)
         return isset($resultItem['faultCode']) && isset($resultItem['faultString']);
     });
 }
-
-
-// function logQueryError($methodName = null)
-// {
-//     global $client;
-
-//     $subject = is_null($methodName) ? 'Client query' : "Client query {$methodName}";
-//     $msg = sprintf("%s failed with code %d: %s", $subject, $client->getErrorCode(), $client->getErrorMessage());
-//     Log::error($msg);
-//     $client->resetError();
-// }
-
-
-// function logMulticallErrors($calls, $errors)
-// {
-//     foreach ($errors as $key => $value)
-//     {
-//         $methodName = $calls[$key]['methodName'];
-//         Log::error("Multicall query {$methodName} failed with code {$value['faultCode']}: {$value['faultString']}");
-//     }
-// }
-
-
-// /**
-//  * Queries the client and retrieves its response.
-//  *
-//  * @param string $methodName The method name of the query.
-//  * @param array ...$args [Optional] The arguments for the specified query.
-//  *
-//  * @return mixed The response from the client if the query was successfully handled, or null if
-//  * an error occurred.
-//  */
-// function query($methodName, $args = null)
-// {
-//     global $client;
-
-//     $success = call_user_func_array(array($client, 'query'), func_get_args());
-//     if ($success)
-//     {
-//         return $client->getResponse();
-//     }
-//     else
-//     {
-//         logQueryError($methodName);
-//         return null;
-//     }
-// }
-
-
-// /**
-//  * Utility class for multicalling.
-//  *
-//  * Supports fluent syntax:
-//  *
-//  *     $multicall = new Multicall();
-//  *     $multicall
-//  *         ->add('ChatSendServerMessage', 'Hello world');
-//  *         ->add('ChatSendServerMessage', 'It's nice to be here');
-//  *         ->submit();
-//  */
-// class Multicall
-// {
-//     private $multicall;
-
-//     public function __construct()
-//     {
-//         $this->multicall = array();
-//     }
-
-//     /**
-//      * Adds a client query to memory.
-//      *
-//      * @param string $methodName The method name of the query.
-//      * @param array ...$args [Optional] The arguments for the specified query.
-//      */
-//     public function add($methodName, $args = null)
-//     {
-//         $args = array_slice(func_get_args(), 1);
-//         $this->multicall[] = array(
-//             'methodName' => $methodName,
-//             'params' => $args
-//         );
-//     }
-
-//     /**
-//      * Submits the in-memory queries to the client.
-//      *
-//      * @return mixed The response from the client if the query was successfully sent, or null if an
-//      * error occurred.
-//      */
-//     public function submit()
-//     {
-//         global $client;
-
-//         $success = $client->query('system.multicall', $this->multicall);
-//         if (!$success)
-//         {
-//             logQueryError('system.multicall');
-//             return null;
-//         }
-//         else
-//         {
-//             $result = $client->getResponse();
-//             $errors = filterMulticallErrors($result);
-//             logMulticallErrors($this->multicall, $errors);
-//             $this->multicall = array();
-//             return $result;
-//         }
-//     }
-// }
 
 
 /**
@@ -1559,7 +1386,7 @@ class UI
 
         Log::debug(sprintf('updateStatusBar %d %d %d %d', $knockoutState, $roundNb, $nbPlayers, $nbKOs));
 
-        $multicall = new GbxClientMulticall($client);
+        $multicall = new \GbxClientMulticall($client);
         foreach ($players as $player)
         {
             $login = $player['Login'];
@@ -1642,7 +1469,7 @@ class UI
 
         $format = function($timeOrScore) use($gameMode, $formatTime)
         {
-            if ($gameMode === GameMode::Stunts)
+            if ($gameMode === \GameMode::Stunts)
             {
                 return $timeOrScore;
             }
@@ -2313,11 +2140,11 @@ function forcePlay($logins, $force)
             $force ? 'ForcePlay' : 'UserSelectable',
             print_r($logins, true)
         ));
-        $multicall = new GbxClientMulticall($client);
+        $multicall = new \GbxClientMulticall($client);
         foreach ($logins as $login)
         {
-            $multicall->forceSpectator($login, SpectatorMode::Player);
-            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
+            $multicall->forceSpectator($login, \SpectatorMode::Player);
+            if (!$force) $multicall->forceSpectator($login, \SpectatorMode::UserSelectable);
         }
         $result = $multicall->submit();
         if (is_null($result)) return false;
@@ -2352,11 +2179,11 @@ function forceSpec($logins, $force)
             $force ? 'ForceSpec' : 'UserSelectable',
             print_r($logins, true)
         ));
-        $multicall = new GbxClientMulticall($client);
+        $multicall = new \GbxClientMulticall($client);
         foreach ($logins as $login)
         {
-            $multicall->forceSpectator($login, SpectatorMode::Spectator);
-            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
+            $multicall->forceSpectator($login, \SpectatorMode::Spectator);
+            if (!$force) $multicall->forceSpectator($login, \SpectatorMode::UserSelectable);
         }
         $result = $multicall->submit();
         if (is_null($result)) return false;
@@ -2425,7 +2252,7 @@ function isForced($player)
     elseif (array_key_exists('Flags', $player))
     {
         $forceSpectator = (int) substr($player['Flags'], 6, 1);
-        return $forceSpectator !== SpectatorMode::UserSelectable;
+        return $forceSpectator !== \SpectatorMode::UserSelectable;
     }
     else
     {
@@ -2469,8 +2296,11 @@ class KnockoutRuntime
     private $maxFalseStarts;
     private $authorSkip;
 
-    public function __construct()
+    public function __construct($client)
     {
+        global $gbxclient;
+        $gbxclient = $client;
+
         $this->koMode = KnockoutMode::Normal;
         $this->playerList = new PlayerList();
         $this->scores = new Scores();
@@ -2507,7 +2337,7 @@ class KnockoutRuntime
         $this->isWarmup = $gbxclient->getWarmUp();
         $status = $gbxclient->getStatus();
         $this->serverStatus = $status['Code'];
-        $this->isPodium = !$this->isWarmup && $this->serverStatus === ServerStatus::Finish;
+        $this->isPodium = !$this->isWarmup && $this->serverStatus === \ServerStatus::Finish;
         $this->gameMode = $gbxclient->getGameMode();
 
         // In case the plugin crashed mid-KO
@@ -2524,7 +2354,7 @@ class KnockoutRuntime
             $this->defaultPointPartition = $CustomPoints;
         }
 
-        Chat::info(sprintf('Knockout plugin %s loaded', KnockoutVersion));
+        Chat::info(sprintf('Knockout plugin %s loaded', Version));
     }
 
     private function getPlayersWithHudOn()
@@ -2581,7 +2411,7 @@ class KnockoutRuntime
 
     private function updateScoreboard($login = null)
     {
-        if ($this->serverStatus === ServerStatus::Play || $this->serverStatus === ServerStatus::Finish)
+        if ($this->serverStatus === \ServerStatus::Play || $this->serverStatus === \ServerStatus::Finish)
         {
             $scores = $this->scores->getSortedScores();
             $nbKOs = $this->kosThisRound;
@@ -2665,13 +2495,13 @@ class KnockoutRuntime
     {
         switch ($this->gameMode)
         {
-            case GameMode::Stunts:
+            case \GameMode::Stunts:
                 $this->scores->setSortingOrder(false);
                 break;
 
-            case GameMode::Laps:
-            case GameMode::Rounds:
-            case GameMode::TimeAttack:
+            case \GameMode::Laps:
+            case \GameMode::Rounds:
+            case \GameMode::TimeAttack:
                 $this->scores->setSortingOrder(true);
                 break;
         }
@@ -2726,6 +2556,7 @@ class KnockoutRuntime
             if ($this->isPodium)
             {
                 Chat::announce('Knockout starting!');
+                Log::information('Knockout starting');
                 $this->hudReminder();
             }
             else
@@ -2737,6 +2568,7 @@ class KnockoutRuntime
         {
             $this->koStatus = KnockoutStatus::Running;
             Chat::announce('Knockout starting!');
+            Log::information('Knockout starting');
             $this->hudReminder();
         }
         else
@@ -3199,23 +3031,23 @@ class KnockoutRuntime
         //   - If someone have finished: completes the round and starts the next one
         switch ($this->gameMode)
         {
-            case GameMode::Stunts:
-            case GameMode::TimeAttack:
+            case \GameMode::Stunts:
+            case \GameMode::TimeAttack:
                 // No way to restart without warmup if settings have changed
                 $gbxclient->restartChallenge();
                 break;
 
-            case GameMode::Cup:
-            case GameMode::Laps:
-            case GameMode::Rounds:
-            case GameMode::Team:
+            case \GameMode::Cup:
+            case \GameMode::Laps:
+            case \GameMode::Rounds:
+            case \GameMode::Team:
                 // Get scores of the current round
                 $scores = $this->scores->getSortedScores();
                 if (isset($scores[0]) && $scores[0]['Score'] > 0)
                 {
                     // If someone have finished, the only way to restart the round (without points
                     // being applied) is to start from round 1
-                    if ($this->gameMode === GameMode::Cup) $gbxclient->restartChallenge(true);
+                    if ($this->gameMode === \GameMode::Cup) $gbxclient->restartChallenge(true);
                     else $gbxclient->restartChallenge();
                 }
                 else
@@ -3237,10 +3069,10 @@ class KnockoutRuntime
         // Changing some setting that takes effect on next challenge (like setting a new game mode)
         // makes RestartChallenge restart the whole challenge, including warmup
         $chattime = $gbxclient->getChatTime();
-        $multicall = new GbxClientMulticall($client);
+        $multicall = new \GbxClientMulticall($client);
         $multicall
             ->setChatTime(0)
-            ->setGameMode(GameMode::Team)
+            ->setGameMode(\GameMode::Team)
             ->setGameMode($this->gameMode)
             ->restartChallenge()
             ->setChatTime($chattime['NextValue'])
@@ -3272,7 +3104,7 @@ class KnockoutRuntime
 
         $this->serverStatus = $args[0];
         // Call callback method explicitly as it's not an event supported by TMGery/plugin manager
-        if ($args[0] === ServerStatus::Synchronization) $this->onBeginSynchronization();
+        if ($args[0] === \ServerStatus::Synchronization) $this->onBeginSynchronization();
     }
 
     /**
@@ -3386,7 +3218,7 @@ class KnockoutRuntime
 
         if ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
         {
-            if ($this->gameMode === GameMode::Stunts || $this->gameMode === GameMode::TimeAttack)
+            if ($this->gameMode === \GameMode::Stunts || $this->gameMode === \GameMode::TimeAttack)
             {
                 $this->scores->initialize($this->playerList->getPlaying());
             }
@@ -3421,7 +3253,7 @@ class KnockoutRuntime
         {
             return true;
         }
-        elseif (($this->gameMode === GameMode::TimeAttack || $this->gameMode === GameMode::Stunts) && $this->roundNumber <= 1)
+        elseif (($this->gameMode === \GameMode::TimeAttack || $this->gameMode === \GameMode::Stunts) && $this->roundNumber <= 1)
         {
             return true;
         }
@@ -3650,8 +3482,8 @@ class KnockoutRuntime
                 // Check if it's the first player to retire and whether a false start can be
                 // considered
                 if ($this->shouldCheckForFalseStarts
-                    && $this->gameMode !== GameMode::Stunts
-                    && $this->gameMode !== GameMode::TimeAttack
+                    && $this->gameMode !== \GameMode::Stunts
+                    && $this->gameMode !== \GameMode::TimeAttack
                     && $timeOrScore === 0
                     && $this->falseStartCount < $this->maxFalseStarts)
                 {
@@ -3688,15 +3520,15 @@ class KnockoutRuntime
                     {
                         switch ($this->gameMode)
                         {
-                            case GameMode::Stunts:
-                            case GameMode::TimeAttack:
+                            case \GameMode::Stunts:
+                            case \GameMode::TimeAttack:
                                 $timeOrScore = Scores::HasNotFinishedYet;
                                 break;
 
-                            case GameMode::Cup:
-                            case GameMode::Team:
-                            case GameMode::Laps:
-                            case GameMode::Rounds:
+                            case \GameMode::Cup:
+                            case \GameMode::Team:
+                            case \GameMode::Laps:
+                            case \GameMode::Rounds:
                                 $timeOrScore = Scores::DidNotFinish;
                                 break;
                         }
@@ -3785,6 +3617,7 @@ class KnockoutRuntime
             case KnockoutStatus::Starting:
             case KnockoutStatus::StartingNow:
                 Chat::announce('Knockout starting!');
+                Log::information('Knockout starting');
                 $this->hudReminder();
                 $this->koStatus = KnockoutStatus::Running;
                 break;
@@ -4015,12 +3848,12 @@ class KnockoutRuntime
         elseif (!isset($args[1]) || strtolower($args[1]) === 'now')
         {
             $mode = $gbxclient->getGameMode();
-            $players = $gbxclient->getPlayerList(255, 0, StructVersion::Forever);
-            if ($mode === GameMode::Team)
+            $players = $gbxclient->getPlayerList(255, 0, \StructVersion::Forever);
+            if ($mode === \GameMode::Team)
             {
                 $onError('Knockout does not work in Team mode');
             }
-            elseif ($mode === GameMode::Cup)
+            elseif ($mode === \GameMode::Cup)
             {
                 $onError('Knockout does not work in Cup mode');
             }
@@ -4147,7 +3980,7 @@ class KnockoutRuntime
             $this->restartRound();
             $text = 'Restarting the current round';
             Chat::info($text);
-            if ($this->gameMode === GameMode::Rounds || $this->gameMode === GameMode::Team)
+            if ($this->gameMode === \GameMode::Rounds || $this->gameMode === \GameMode::Team)
             {
                 UI::showMessage($text, 5);
             }
@@ -5266,7 +5099,7 @@ class KnockoutRuntime
                 {
                     // Manialink ID is encoded with the target playerID (Manialink ID + Player ID)
                     $target = $manialinkId - Actions::SpectatePlayer;
-                    $gbxclient->forceSpectatorTargetId($playerId, $target, CameraType::Unchanged);
+                    $gbxclient->forceSpectatorTargetId($playerId, $target, \CameraType::Unchanged);
                 }
                 break;
         }
@@ -5299,7 +5132,9 @@ class KnockoutRuntime
     }
 }
 
-$this->AddPlugin(new KnockoutRuntime());
+$gbxclient = new \GbxClient($client);
+
+$this->AddPlugin(new KnockoutRuntime($gbxclient));
 
 $this->AddEvent('onStartup', 'onControllerStartup');
 $this->AddEvent('BeginRound', 'onBeginRound');
