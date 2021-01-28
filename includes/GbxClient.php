@@ -2,9 +2,10 @@
 /*
  * XML-RPC Gbx API classes for TmForever by Voyager006.
  *
- * Reflects version 2.11.26 (build 2011-02-21). Targeting PHP 5.3.
+ * Reflects version 2.11.26 (build 2011-02-21).
  * https://methods.xaseco.org/methodstmf.php
  */
+namespace Gbx;
 
 
 interface TmForeverMethods
@@ -698,7 +699,7 @@ interface TmForeverMethods
      *
      * @return bool
      */
-    public function echoInvoke($param1, $param2);
+    public function echoCallback($param1, $param2);
 
     /**
      * Ignore the player with the specified login. Only available to Admin.
@@ -2343,7 +2344,7 @@ abstract class ClientLogging
  *
  * The functions in this class perform queries immediately as opposed to GbxClientMulticall.
  */
-class GbxClient extends ClientLogging implements TmForeverMethods
+class Client extends ClientLogging implements TmForeverMethods
 {
     /**
      * Instantiates a new API class using an existing XML-RPC connection. This constructor does not
@@ -2726,7 +2727,7 @@ class GbxClient extends ClientLogging implements TmForeverMethods
         return $this->query('TunnelSendDataToLogin', $fileName, $data);
     }
 
-    public function echoInvoke($param1, $param2)
+    public function echoCallback($param1, $param2)
     {
         return $this->query('Echo', $param1, $param2);
     }
@@ -3554,7 +3555,7 @@ class GbxClient extends ClientLogging implements TmForeverMethods
  * Methods in this class do not perform queries themselves; instead, method calls are added until
  * they are submitted using the submit() method.
  */
-class GbxClientMulticall extends ClientLogging implements TmForeverMethods
+class Multicall extends ClientLogging implements TmForeverMethods
 {
     /**
      * Instantiates a new multicall client.
@@ -4214,7 +4215,7 @@ class GbxClientMulticall extends ClientLogging implements TmForeverMethods
     /**
      * @return $this This object, for chaining.
      */
-    public function echoInvoke($param1, $param2)
+    public function echoCallback($param1, $param2)
     {
         $this->addCall('Echo', $param1, $param2);
         return $this;

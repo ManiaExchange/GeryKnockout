@@ -2,10 +2,11 @@
 /*
  * XML-RPC Gbx structs for TmForever by Voyager006.
  *
- * Reflects version 2.11.26 (build 2011-02-21). Targeting PHP 5.3.
+ * Reflects version 2.11.26 (build 2011-02-21).
  * https://methods.xaseco.org/methodstmf.php
  * https://server.xaseco.org/callbacks.php
  */
+namespace Gbx;
 
 
 class SChallengeInfo
