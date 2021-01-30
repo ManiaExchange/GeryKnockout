@@ -8,18 +8,19 @@ namespace Knockout;
 
 const Version = '3.0.0 (beta)';
 const MinimumLogLevel = Log::Information;
+const AuthorSkipLimit = 10;
 
-require_once 'includes/GbxClient.php';
-require_once 'includes/GbxStructs.php';
+require_once 'includes/MethodsTmf.php';
+require_once 'includes/StructsTmf.php';
 
-use Gbx\Client as Client;
-use Gbx\Multicall as Multicall;
+use Tmf\Client as Client;
+use Tmf\Multicall as Multicall;
 
-use Gbx\CameraType as CameraType;
-use Gbx\GameMode as GameMode;
-use Gbx\ServerStatus as ServerStatus;
-use Gbx\SpectatorMode as SpectatorMode;
-use Gbx\StructVersion as StructVersion;
+use Tmf\CameraType as CameraType;
+use Tmf\GameMode as GameMode;
+use Tmf\ServerStatus as ServerStatus;
+use Tmf\SpectatorMode as SpectatorMode;
+use Tmf\StructVersion as StructVersion;
 
 
 /**
@@ -61,7 +62,8 @@ function getNameOfConstant($value, $className)
         }
         catch (\ReflectionException $e)
         {
-            // Try with next class
+            // Could not find a class of the given name
+            // Try with next class name
         }
     }
     return false;
@@ -69,7 +71,7 @@ function getNameOfConstant($value, $className)
 
 
 /**
- * Compares two numeric values.
+ * Compares two numbers.
  *
  * @param int|float $a A number.
  * @param int|float $b The number to compare `$a` against.
@@ -128,7 +130,197 @@ if (!function_exists('str_contains')) {
 }
 
 
-class KnockoutMode
+/**
+ * Tests if the given player is connected to the server.
+ *
+ * @param string $login The login of the player.
+ *
+ * @return bool True if the player is currently on the server.
+ */
+function isOnServer($login)
+{
+    global $PlayerScript;
+
+    return isset($PlayerScript[$login]);
+}
+
+
+/**
+ * Tests if the given player has TMGery HUD enabled. If the player is not found, false is returned.
+ *
+ * @param string $login The login of the player.
+ *
+ * @return bool True if HUD is shown for the player.
+ */
+function hasHudOn($login)
+{
+    global $PlayerScript;
+
+    if (isset($PlayerScript[$login]))
+    {
+        return $PlayerScript[$login] === '1';
+    }
+    else
+    {
+        Log::warning(sprintf('Could not find player %s in PlayerScript', $login));
+        return false;
+    }
+}
+
+
+function filterMulticallErrors($result)
+{
+    return array_filter($result, function($item)
+    {
+        return isset($item['faultCode']) && isset($item['faultString']);
+    });
+}
+
+
+/**
+ * Forces given players into play.
+ *
+ * @param string|array $logins A login or an array of logins.
+ * @param bool $force Whether the player(s) should be unable to switch between play and spec after
+ * forcing. Set to false to let player(s) go to spec afterwards.
+ *
+ * @return bool True if the queries were sent successfully, false if an error occurred or there are
+ * no players to be forced.
+ */
+function forcePlay($logins, $force)
+{
+    global $client;
+
+    if (!is_array($logins)) $logins = array($logins);
+    if (count($logins) > 0)
+    {
+        Log::debug(sprintf(
+            'Forcing the following players into play (%s): %s',
+            $force ? 'ForcePlay' : 'UserSelectable',
+            print_r($logins, true)
+        ));
+        $multicall = new Multicall($client);
+        foreach ($logins as $login)
+        {
+            $multicall->forceSpectator($login, SpectatorMode::Player);
+            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
+        }
+        $result = $multicall->submit();
+        if (is_null($result)) return false;
+        else return count(filterMulticallErrors($result)) === 0;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+
+/**
+ * Forces given players into being spectators.
+ *
+ * @param string|array $logins A login or an array of logins.
+ * @param bool $force Whether the player(s) should be unable to switch between play and spec after
+ * forcing. Set to false to let player(s) go to play afterwards.
+ *
+ * @return bool True if the queries were sent successfully, false if an error occurred or there are
+ * no players to be forced.
+ */
+function forceSpec($logins, $force)
+{
+    global $client;
+
+    if (!is_array($logins)) $logins = array($logins);
+    if (count($logins) > 0)
+    {
+        Log::debug(sprintf(
+            'Forcing the following players into spec (%s): %s',
+            $force ? 'ForceSpec' : 'UserSelectable',
+            print_r($logins, true)
+        ));
+        $multicall = new Multicall($client);
+        foreach ($logins as $login)
+        {
+            $multicall->forceSpectator($login, SpectatorMode::Spectator);
+            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
+        }
+        $result = $multicall->submit();
+        if (is_null($result)) return false;
+        else return count(filterMulticallErrors($result)) === 0;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+
+/**
+ * Returns the logins of a player array.
+ *
+ * @param array $players An array of player structs, each containing a field 'Login'.
+ *
+ * @return array An array of the logins of the players.
+ */
+function logins($players)
+{
+    return array_map(
+        function($player) { return $player['Login']; },
+        $players
+    );
+}
+
+
+/**
+ * Tests if a player is a spectator.
+ *
+ * @param array $player An SPlayerInfo struct of the given player, received from a callback or
+ * retrieved using 'GetPlayerInfo' or 'GetDetailedPlayerInfo'.
+ *
+ * @return bool True if the player object is configured to be spectating, false otherwise.
+ */
+function isSpectator($player)
+{
+    if (is_null($player))
+    {
+        return false;
+    }
+    else
+    {
+        return (array_key_exists('IsSpectator', $player) && $player['IsSpectator'])
+            || (array_key_exists('SpectatorStatus', $player) && substr($player['SpectatorStatus'], 4, 1) === '1')
+            || (array_key_exists('Flags', $player) && substr($player['Flags'], 6, 1) === '1');
+    }
+}
+
+
+/**
+ * Tests if a player is currently forced to play or forced to spec.
+ *
+ * @param array $player An SPlayerInfo struct of the given player, received from a callback or
+ * retrieved using 'GetDetailedPlayerInfo'.
+ *
+ * @return bool True if the player is not able to enter/exit spectator mode, false otherwise.
+ */
+function isForced($player)
+{
+    if (is_null($player))
+    {
+        return false;
+    }
+    elseif (array_key_exists('Flags', $player))
+    {
+        $forceSpectator = (int) substr($player['Flags'], 6, 1);
+        return $forceSpectator !== SpectatorMode::UserSelectable;
+    }
+    else
+    {
+        return false;
+    }
+}
+
+
+abstract class KnockoutMode
 {
     const Normal = 11;
     // const Countdown = 12; // Beat the slowest surviving player's time
@@ -139,7 +331,7 @@ class KnockoutMode
 }
 
 
-class KnockoutStatus
+abstract class KnockoutStatus
 {
     const Idle = 21;
     const Starting = 22;
@@ -168,7 +360,7 @@ class KnockoutStatus
 }
 
 
-class PlayerStatus
+abstract class PlayerStatus
 {
     const Playing = 41;
     const PlayingAndDisconnected = 42;  // When someone is disconnected but still eligible to rejoin and play
@@ -262,7 +454,7 @@ class PlayerStatus
 /**
  * Utility class for logging in the console window.
  */
-class Log
+abstract class Log
 {
     const Debug = 51;
     const Information = 52;
@@ -271,7 +463,8 @@ class Log
 
     private static function write($level, $message)
     {
-        printf("[%s %s] plugin.knockout.php: %s\n", date('H:i:s'), $level, $message);
+        $time = date('H:i:s');
+        printf("[{$time} {$level}] plugin.knockout.php: {$message}\n");
     }
 
     /**
@@ -319,7 +512,7 @@ class Log
 /**
  * Links to manialink IDs
  */
-class Actions
+abstract class Actions
 {
     const ToggleHUD = 98;
     const Dismiss = 99;
@@ -329,101 +522,15 @@ class Actions
     const CliReferencePage3 = 513;
 
     // Ranges
-    const SpectatePlayer = 1024;
+    const SpectatePlayerMin = 1024;
     const SpectatePlayerMax = 1279;
-}
-
-
-/**
- * Class to hold the overall result of a knockout
- */
-class Results
-{
-    private $results;
-    private $startTime;
-
-    public function __construct()
-    {
-        $this->results = array();
-        $this->startTime = time();
-    }
-
-    public function insert($login, $nickName, $roundNumber, $score)
-    {
-        $this->results[] = array(
-            'Login' => $login,
-            'NickName' => $nickName,
-            'RoundNumber' => $roundNumber,
-            'Score' => $score
-        );
-    }
-
-    private function compare($index1, $index2)
-    {
-        $a = $this->results[$index1];
-        $b = $this->results[$index2];
-        $roundsComparison = compare($a['RoundNumber'], $b['RoundNumber']);
-        if ($roundsComparison != 0) return $roundsComparison;
-        else return compare($a['Score'], $b['Score']);
-    }
-
-    public function export()
-    {
-        print_r($this->results);
-        $directory = 'results';
-        $fileName = "{$directory}\Knockout-" . date('ymd-Hi', $this->startTime) . '.txt';
-        $data = 'Knockout event — ' . date('jS F Y, H:i', $this->startTime) . "\n";
-        $finalResults = array_reverse($this->results);
-        $i = 0;
-
-        foreach ($finalResults as $player)
-        {
-            $index = $i;
-            while ($index > 0 && $this->compare($index - 1, $i) === 0)
-            {
-                $index -= 1;
-            }
-
-            $isTiedWithPlayerAbove = $i === 0 ? false : $this->compare($i - 1, $i);
-            $isTiedWithPlayerBelow = $i === count($this->results) -1 ? false : $this->compare($i, $i + 1);
-            $isTie = $isTiedWithPlayerAbove || $isTiedWithPlayerBelow;
-            if ($isTie) $data .= '=';
-
-            $position = $index + 1;
-            $nickName = Text::clean($player['NickName']);
-            $data .= "{$position}. {$nickName} ({$player['Login']}) ({$player['RoundNumber']})\n";
-            $i += 1;
-        }
-
-        if (!file_exists($directory)) {
-            mkdir($directory);
-        }
-
-        if (file_put_contents($fileName, $data) === false)
-        {
-            Log::information("Export of results failed, instead, results are posted here: \n{$data}");
-        }
-        else
-        {
-            Log::information("Results exported to {$fileName}");
-        }
-    }
-}
-
-
-function filterMulticallErrors($result)
-{
-    return array_filter($result, function($item)
-    {
-        return isset($resultItem['faultCode']) && isset($resultItem['faultString']);
-    });
 }
 
 
 /**
  * Utility class for text formatting (not associated with chat).
  */
-class Text
+abstract class Text
 {
     /**
      * Finds and replaces formatting tags in a string using a callback function.
@@ -731,9 +838,90 @@ class Text
 
 
 /**
+ * Class to hold the overall result of a knockout
+ */
+class Results
+{
+    private $results;
+    private $startTime;
+
+    public function __construct()
+    {
+        $this->results = array();
+        $this->startTime = time();
+    }
+
+    public function insert($login, $nickName, $roundNumber, $score)
+    {
+        $this->results[] = array(
+            'Login' => $login,
+            'NickName' => $nickName,
+            'RoundNumber' => $roundNumber,
+            'Score' => $score
+        );
+    }
+
+    private function compare($index1, $index2)
+    {
+        $a = $this->results[$index1];
+        $b = $this->results[$index2];
+        $roundsComparison = compare($a['RoundNumber'], $b['RoundNumber']);
+        if ($roundsComparison !== 0) return $roundsComparison;
+        else return compare($a['Score'], $b['Score']);
+    }
+
+    public function export()
+    {
+        $directory = 'results';
+        $fileDate = date('ymd-Hi', $this->startTime);
+        $fileName = "{$directory}\Knockout-{$fileDate}.txt";
+
+        $headerDate = date('jS F Y, H:i', $this->startTime);
+        $data = "Knockout event — {$headerDate}\n";
+
+        $finalResults = array_reverse($this->results);
+        $i = 0;
+        $count = count($finalResults);
+
+        foreach ($finalResults as $player)
+        {
+            $index = $i;
+            while ($index > 0 && $this->compare($index - 1, $i) === 0)
+            {
+                $index -= 1;
+            }
+
+            $isTiedWithPlayerAbove = $i > 0 && $this->compare($i - 1, $i) === 0;
+            $isTiedWithPlayerBelow = $i < $count - 1 && $this->compare($i, $i + 1) === 0;
+            $isTie = $isTiedWithPlayerAbove || $isTiedWithPlayerBelow;
+            if ($isTie) $data .= '=';
+
+            $position = $index + 1;
+            $nickName = Text::clean($player['NickName']);
+            $data .= "{$position}. {$nickName} ({$player['Login']}) ({$player['RoundNumber']})\n";
+            $i += 1;
+        }
+
+        if (!file_exists($directory)) {
+            mkdir($directory);
+        }
+
+        if (file_put_contents($fileName, $data) === false)
+        {
+            Log::information("Export of results failed, instead, results are written to terminal: \n{$data}");
+        }
+        else
+        {
+            Log::information("Results exported to {$fileName}");
+        }
+    }
+}
+
+
+/**
  * Utility class for in-game chat messaging.
  */
-class Chat
+abstract class Chat
 {
     const Prefix = '$ff0';
 
@@ -1417,7 +1605,7 @@ class PlayerList
 /**
  * Utility class for manialinks.
  */
-class UI
+abstract class UI
 {
     const StatusBar = 420;
     const Scoreboard = 430;
@@ -1621,7 +1809,7 @@ class UI
                 $scoreText = $format($score['Score']);
                 $scrWidth = $scoreWidth($scoreText);
                 // Encode manialink ID with the target playerID
-                $action = Actions::SpectatePlayer + $score['PlayerId'];
+                $action = Actions::SpectatePlayerMin + $score['PlayerId'];
                 return '
                     <frame posn="-12 ' . $height . ' 1">
                         <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $color . '" />
@@ -2126,7 +2314,7 @@ class KOMultiplier
             $currentCurve = $this->getScaledCurve($baseCurve, $f);
             $kos = $calculateTotalRemainingKOs($currentCurve, $currentRound, $totalRounds);
             $sgNew = sign($playersToKO - $kos);
-            if ($sgNew != $sg)
+            if ($sgNew !== $sg)
             {
                 // Reduce optimization step size if we overshot target
                 $fStep = 0.25 * $fStep;
@@ -2199,187 +2387,6 @@ class KOMultiplier
 
 
 /**
- * Tests if the given player is connected to the server.
- *
- * @param string $login The login of the player.
- *
- * @return bool True if the player is currently on the server.
- */
-function isOnServer($login)
-{
-    global $PlayerScript;
-
-    return isset($PlayerScript[$login]);
-}
-
-
-/**
- * Tests if the given player has TMGery HUD enabled. If the player is not found, false is returned.
- *
- * @param string $login The login of the player.
- *
- * @return bool True if HUD is shown for the player.
- */
-function hasHudOn($login)
-{
-    global $PlayerScript;
-
-    if (isset($PlayerScript[$login]))
-    {
-        return $PlayerScript[$login] === '1';
-    }
-    else
-    {
-        Log::warning(sprintf('Could not find player %s in PlayerScript', $login));
-        return false;
-    }
-}
-
-
-/**
- * Forces given players into play.
- *
- * @param string|array $logins A login or an array of logins.
- * @param bool $force Whether the player(s) should be able to switch between play and spec after
- * forcing.
- *
- * @return bool True if the queries were sent successfully, false if an error occurred or there are
- * no players to be forced.
- */
-function forcePlay($logins, $force)
-{
-    global $client;
-
-    if (!is_array($logins)) $logins = array($logins);
-    if (count($logins) > 0)
-    {
-        Log::debug(sprintf(
-            'Forcing the following players into play (%s): %s',
-            $force ? 'ForcePlay' : 'UserSelectable',
-            print_r($logins, true)
-        ));
-        $multicall = new Multicall($client);
-        foreach ($logins as $login)
-        {
-            $multicall->forceSpectator($login, SpectatorMode::Player);
-            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
-        }
-        $result = $multicall->submit();
-        if (is_null($result)) return false;
-        else return count(filterMulticallErrors($result)) === 0;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-
-/**
- * Forces given players into being spectators.
- *
- * @param string|array $logins A login or an array of logins.
- * @param bool $force Whether the player(s) should be able to switch between play and spec after
- * forcing.
- *
- * @return bool True if the queries were sent successfully, false if an error occurred or there are
- * no players to be forced.
- */
-function forceSpec($logins, $force)
-{
-    global $client;
-
-    if (!is_array($logins)) $logins = array($logins);
-    if (count($logins) > 0)
-    {
-        Log::debug(sprintf(
-            'Forcing the following players into spec (%s): %s',
-            $force ? 'ForceSpec' : 'UserSelectable',
-            print_r($logins, true)
-        ));
-        $multicall = new Multicall($client);
-        foreach ($logins as $login)
-        {
-            $multicall->forceSpectator($login, SpectatorMode::Spectator);
-            if (!$force) $multicall->forceSpectator($login, SpectatorMode::UserSelectable);
-        }
-        $result = $multicall->submit();
-        if (is_null($result)) return false;
-        else return count(filterMulticallErrors($result)) === 0;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-
-/**
- * Returns the logins of a player array.
- *
- * @param array $players An array of player structs, each containing a field 'Login'.
- *
- * @return array An array of the logins of the players.
- */
-function logins($players)
-{
-    return array_map(
-        function($player) { return $player['Login']; },
-        $players
-    );
-}
-
-
-/**
- * Tests if a player is a spectator.
- *
- * @param array $player An SPlayerInfo struct of the given player, received from a callback or
- * retrieved using 'GetPlayerInfo' or 'GetDetailedPlayerInfo'.
- *
- * @return bool True if the player object is configured to be spectating, false otherwise.
- */
-function isSpectator($player)
-{
-    if (is_null($player))
-    {
-        return false;
-    }
-    else
-    {
-        return (array_key_exists('IsSpectator', $player) && $player['IsSpectator'])
-            || (array_key_exists('SpectatorStatus', $player) && substr($player['SpectatorStatus'], 4, 1) === '1')
-            || (array_key_exists('Flags', $player) && substr($player['Flags'], 6, 1) === '1');
-    }
-}
-
-
-/**
- * Tests if a player is currently forced to play or forced to spec.
- *
- * @param array $player An SPlayerInfo struct of the given player, received from a callback or
- * retrieved using 'GetDetailedPlayerInfo'.
- *
- * @return bool True if the player is not able to enter/exit spectator mode, false otherwise.
- */
-function isForced($player)
-{
-    if (is_null($player))
-    {
-        return false;
-    }
-    elseif (array_key_exists('Flags', $player))
-    {
-        $forceSpectator = (int) substr($player['Flags'], 6, 1);
-        return $forceSpectator !== SpectatorMode::UserSelectable;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-
-/**
  * The main runtime to be attached to the plugin manager.
  */
 class KnockoutRuntime
@@ -2403,12 +2410,11 @@ class KnockoutRuntime
     private $gameMode;
     private $serverStatus;
 
-    // Defaults
-    private $defaultVoteTimeout = 60;
-    private $defaultPointPartition = array(10, 8, 7, 6, 5, 4, 3, 2, 1);
-    private $authorSkipLimit = 10;
+    // Server settings
+    private $defaultVoteTimeout;
+    private $defaultPointPartition;
 
-    // Settings
+    // Knockout settings
     private $koMultiplier;
     private $lives;
     private $openWarmup;
@@ -2441,6 +2447,9 @@ class KnockoutRuntime
         $this->gameMode = -1;
         $this->serverStatus = -1;
 
+        $this->defaultVoteTimeout = -1;
+        $this->defaultPointPartition = array();
+
         $this->koMultiplier = new KOMultiplier();
         $this->lives = 1;
         $this->openWarmup = true;
@@ -2455,8 +2464,6 @@ class KnockoutRuntime
     public function onControllerStartup()
     {
         global $PlayerList;
-        global $RoundCustomPoints;
-        global $CustomPoints;
         global $gbxclient;
 
         $this->isWarmup = $gbxclient->getWarmUp();
@@ -2469,15 +2476,6 @@ class KnockoutRuntime
         UI::hideStatusBar();
         UI::restoreDefaultScoreboard();
         forcePlay(logins($PlayerList), false);
-        $timeout = $gbxclient->getCallVoteTimeOut();
-        if ($timeout['CurrentValue'] === 0)
-        {
-            $gbxclient->setCallVoteTimeOut($this->defaultVoteTimeout);
-        }
-        if ($RoundCustomPoints === 1)
-        {
-            $this->defaultPointPartition = $CustomPoints;
-        }
 
         Chat::info(sprintf('Knockout plugin %s loaded', Version));
     }
@@ -2650,16 +2648,24 @@ class KnockoutRuntime
         global $gbxclient;
 
         $playerCount = count($this->playerList->getPlaying());
-        $nbKOs = $this->kosThisRound;
-        $numberOfSurvivors = $playerCount <= 1 ? 1 : $playerCount - $nbKOs;
-        $scoresPartition = array_merge(
-            array_fill(0, $numberOfSurvivors, 1),
-            array(0)
-        );
+
         // The game will complain if the number of elements in the scores partition exceed the
-        // number of players on the server (which can happen due to the trailing 0). Relaxing the
-        // constraints circumvents this.
-        $gbxclient->setRoundCustomPoints($scoresPartition, true);
+        // number of players on the server (which can happen due to the trailing 0).
+        $scoresPartition = null;
+        if ($playerCount <= 1)
+        {
+            $scoresPartition = array(1);
+        }
+        else
+        {
+            $nbKOs = $this->kosThisRound;
+            $numberOfSurvivors = $playerCount - $nbKOs;
+            $scoresPartition = array_merge(
+                array_fill(0, $numberOfSurvivors, 1),
+                array(0)
+            );
+        }
+        $gbxclient->setRoundCustomPoints($scoresPartition);
     }
 
     /**
@@ -2672,6 +2678,8 @@ class KnockoutRuntime
     {
         global $gbxclient;
 
+        $this->defaultPointPartition = $gbxclient->getRoundCustomPoints();
+        $this->defaultVoteTimeout = $gbxclient->getCallVoteTimeOut();
         $gbxclient->setCallVoteTimeOut(0);
         $this->playerList->addAll($players, PlayerStatus::Playing, $this->lives);
         forcePlay(logins($this->playerList->getAll()), true);
@@ -2721,6 +2729,8 @@ class KnockoutRuntime
         $this->scores->reset();
         $gbxclient->setCallVoteTimeOut($this->defaultVoteTimeout);
         $gbxclient->setRoundCustomPoints($this->defaultPointPartition);
+        $this->defaultVoteTimeout = -1;
+        $this->defaultPointPartition = array();
         $this->koStatus = KnockoutStatus::Idle;
         $this->results = null;
     }
@@ -3041,9 +3051,8 @@ class KnockoutRuntime
         $nbSkips = 0;
         $nextChallenge = $gbxclient->getNextChallengeInfo();
         $authorIsStillIn = $this->playerList->hasStatus($nextChallenge['Author'], PlayerStatus::Playing);
-        $maxSkips = $this->authorSkipLimit;
 
-        while ($authorIsStillIn && $nbSkips < $maxSkips)
+        while ($authorIsStillIn && $nbSkips < AuthorSkipLimit)
         {
             $nextAuthor = $this->playerList->get($nextChallenge['Author']);
             // 'NextChallenge' has no effect once we're in the podium, so we'll do a dirty hack
@@ -3055,7 +3064,7 @@ class KnockoutRuntime
                 $nextChallenge['Name'],
                 $nextAuthor['NickName'],
                 $nbSkips,
-                $maxSkips
+                AuthorSkipLimit
             ));
             // Then we can grab the challenge coming after that and check the author again
             $nextChallenge = $gbxclient->getNextChallengeInfo();
@@ -3822,7 +3831,9 @@ class KnockoutRuntime
                         if ($result === false)
                         {
                             Chat::info('Everyone seems to have been knocked out!');
+                            $this->results->export();
                             $this->stop();
+                            Log::information('Knockout completed with no winner');
                         }
                         elseif (count($remainingPlayers) === 1)
                         {
@@ -4026,6 +4037,16 @@ class KnockoutRuntime
         }
         else
         {
+            if ($this->roundNumber > 0)
+            {
+                $remainingPlayers = $this->playerList->getPlayingOrShelved();
+                while (count($remainingPlayers) > 0)
+                {
+                    $player = array_pop($remainingPlayers);
+                    $this->results->insert($player['Login'], $player['NickName'], $this->roundNumber, 0);
+                }
+                $this->results->export();
+            }
             $this->stop();
             UI::restoreDefaultScoreboard();
             $this->koStatus = KnockoutStatus::Idle;
@@ -5234,10 +5255,10 @@ class KnockoutRuntime
                 break;
 
             default:
-                if ($manialinkId >= Actions::SpectatePlayer && $manialinkId <= Actions::SpectatePlayerMax)
+                if ($manialinkId >= Actions::SpectatePlayerMin && $manialinkId <= Actions::SpectatePlayerMax)
                 {
                     // Manialink ID is encoded with the target playerID (Manialink ID + Player ID)
-                    $target = $manialinkId - Actions::SpectatePlayer;
+                    $target = $manialinkId - Actions::SpectatePlayerMin;
                     $gbxclient->forceSpectatorTargetId($playerId, $target, CameraType::Unchanged);
                 }
                 break;

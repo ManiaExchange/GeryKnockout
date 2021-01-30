@@ -1,12 +1,12 @@
 <?php
 /*
- * XML-RPC Gbx structs for TmForever by Voyager006.
+ * TmForever XML-RPC structs for PHP by Voyager006.
  *
  * Reflects version 2.11.26 (build 2011-02-21).
  * https://methods.xaseco.org/methodstmf.php
  * https://server.xaseco.org/callbacks.php
  */
-namespace Gbx;
+namespace Tmf;
 
 
 class SChallengeInfo
@@ -188,6 +188,52 @@ class SPlayerInfo
 }
 
 
+class Skins
+{
+    /** @var string $environnement */
+    public $environnement;
+
+    /** @var PackDesc $packDesc */
+    public $packDesc;
+
+    public function __construct($array)
+    {
+        $this->environnement = $array['Environnement'];
+        $this->packDesc = new PackDesc($array['PackDesc']);
+    }
+}
+
+
+abstract class GbxFile
+{
+    /** @var string $fileName */
+    public $fileName;
+
+    /** @var string $checksum */
+    public $checksum;
+}
+
+
+class PackDesc extends GbxFile
+{
+    public function __construct($array)
+    {
+        $this->fileName = $array['FileName'];
+        $this->checksum = $array['Checksum'];
+    }
+}
+
+
+class Avatar extends GbxFile
+{
+    public function __construct($array)
+    {
+        $this->fileName = $array['FileName'];
+        $this->checksum = $array['Checksum'];
+    }
+}
+
+
 class SDetailedPlayerInfo
 {
     /** @var string $login */
@@ -252,52 +298,6 @@ class SDetailedPlayerInfo
         $this->ladderStats = $array['LadderStats'];
         $this->hoursSinceZoneInscription = $array['HoursSinceZoneInscription'];
         $this->onlineRights = $array['OnlineRights'];
-    }
-}
-
-
-class Skins
-{
-    /** @var string $environnement */
-    public $environnement;
-
-    /** @var PackDesc $packDesc */
-    public $packDesc;
-
-    public function __construct($array)
-    {
-        $this->environnement = $array['Environnement'];
-        $this->packDesc = new PackDesc($array['PackDesc']);
-    }
-}
-
-
-abstract class GbxFile
-{
-    /** @var string $fileName */
-    public $fileName;
-
-    /** @var string $checksum */
-    public $checksum;
-}
-
-
-class PackDesc extends GbxFile
-{
-    public function __construct($array)
-    {
-        $this->fileName = $array['FileName'];
-        $this->checksum = $array['Checksum'];
-    }
-}
-
-
-class Avatar extends GbxFile
-{
-    public function __construct($array)
-    {
-        $this->fileName = $array['FileName'];
-        $this->checksum = $array['Checksum'];
     }
 }
 
@@ -390,19 +390,19 @@ class SServerOptions
 
 class SServerOptionsInfo extends SServerOptions
 {
-    /** @var int $ */
+    /** @var int $currentMaxPlayers */
     public $currentMaxPlayers;
 
-    /** @var int $ */
+    /** @var int $currentMaxSpectators */
     public $currentMaxSpectators;
 
-    /** @var int $ */
+    /** @var int $currentLadderMode */
     public $currentLadderMode;
 
-    /** @var int $ */
+    /** @var int $currentVehicleNetQuality */
     public $currentVehicleNetQuality;
 
-    /** @var int $ */
+    /** @var int $currentCallVoteTimeOut */
     public $currentCallVoteTimeOut;
 
     public function __construct($array)
@@ -421,6 +421,13 @@ class SGameInfo
 {
 
 }
+
+
+class SPlayerNetInfos
+{
+
+}
+
 
 class SNetworkStats
 {

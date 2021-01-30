@@ -1,14 +1,14 @@
 <?php
 /*
- * XML-RPC Gbx API classes for TmForever by Voyager006.
+ * TmForever XML-RPC methods for PHP by Voyager006.
  *
  * Reflects version 2.11.26 (build 2011-02-21).
  * https://methods.xaseco.org/methodstmf.php
  */
-namespace Gbx;
+namespace Tmf;
 
 
-interface TmForeverMethods
+interface Methods
 {
     /**
      * Return an array of all available XML-RPC methods on this server.
@@ -36,8 +36,6 @@ interface TmForeverMethods
      * @return string
      */
     public function methodHelp($methodName);
-
-    // public function multicall($calls);
 
     /**
      * Allow user authentication by specifying a login and a password, to gain access to the set of
@@ -2313,7 +2311,7 @@ interface TmForeverMethods
 }
 
 
-abstract class ClientLogging
+abstract class Logging
 {
     protected $client;
 
@@ -2336,19 +2334,27 @@ abstract class ClientLogging
             }
         }
     }
+
+    protected function filterMulticallErrors($result)
+    {
+        return array_filter($result, function($item)
+        {
+            return isset($item['faultCode']) && isset($item['faultString']);
+        });
+    }
 }
 
 
 /**
  * XML-RPC functions for querying the dedicated server.
  *
- * The functions in this class perform queries immediately as opposed to GbxClientMulticall.
+ * The functions in this class perform queries immediately as opposed to the Multicall class.
  */
-class Client extends ClientLogging implements TmForeverMethods
+class Client extends Logging implements Methods
 {
     /**
-     * Instantiates a new API class using an existing XML-RPC connection. This constructor does not
-     * establish a connection to the server.
+     * Instantiates a new client class using an existing XML-RPC connection. This constructor does
+     * not establish a connection to the server.
      *
      * @param IXR_Client_Gbx $client The XML-RPC connection to use.
      */
@@ -2393,7 +2399,7 @@ class Client extends ClientLogging implements TmForeverMethods
      * string}. This is useful when you need to make lots of small calls without lots of round
      * trips.
      *
-     * Consider using the GbxClientMulticall class for fluent multicall query building.
+     * Consider using the Multicall class for fluent multicall query building.
      *
      * @param array $calls
      *
@@ -2403,7 +2409,11 @@ class Client extends ClientLogging implements TmForeverMethods
     {
         $calls = $this->client->calls;
         $result = $this->query('system.multicall', $calls);
-        $this->logMulticallErrors($calls, $result);
+        if (is_array($result))
+        {
+            $errors = $this->filterMulticallErrors($result);
+            $this->logMulticallErrors($calls, $errors);
+        }
         return $result;
     }
 
@@ -3555,7 +3565,7 @@ class Client extends ClientLogging implements TmForeverMethods
  * Methods in this class do not perform queries themselves; instead, method calls are added until
  * they are submitted using the submit() method.
  */
-class Multicall extends ClientLogging implements TmForeverMethods
+class Multicall extends Logging implements Methods
 {
     /**
      * Instantiates a new multicall client.
@@ -3565,14 +3575,6 @@ class Multicall extends ClientLogging implements TmForeverMethods
     public function __construct($client)
     {
         $this->client = $client;
-    }
-
-    protected function filterMulticallErrors($result)
-    {
-        return array_filter($result, function($item)
-        {
-            return isset($item['faultCode']) && isset($item['faultString']);
-        });
     }
 
     protected function addCall()
