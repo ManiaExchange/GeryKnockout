@@ -35,7 +35,9 @@ Note: adding players during a tiebreaker will make them able to play once the ti
 ### /ko remove (*login* | \*)
 Removes a player with login `login` from the knockout, regardless of how many lives they have. If the wildcard `*` is used, then everyone that are currently playing are removed from the knockout.
 
-If applied during a round, the player(s) will be put in spec and their runs will count as DNF (regardless whether they finished or not). Keep in mind that it won't be a free round; KOs are still performed as usual but without the removed player.
+If applied during a round, the player(s) will instantly be put in spec and their runs will not count (regardless whether they finished or not). Keep in mind that it won't be a free round; KOs are still performed as usual but without the removed player.
+
+Using this command with the dynamic KO multiplier (`/ko multi dynamic <total_rounds>`) may alter the number of KOs to be performed.
 
 Examples:
 
