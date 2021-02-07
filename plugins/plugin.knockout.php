@@ -1125,7 +1125,7 @@ class Scores
                 'Score' => 0
             );
         };
-        $this->scores = array_map($init, $players);
+        $this->scores = array_map($init, array_values($players));
     }
 
     /**
@@ -1137,25 +1137,16 @@ class Scores
         {
             $current = $this->scores[$i];
             $next = $this->scores[$i - 1];
-            $shouldMoveUp = false;
-            if ($current['Score'] <= 0)
-            {
-                // Prioritize later DNFs over earlier DNFs
-                $shouldMoveUp = $next['Score'] <= 0;
-            }
+            if ($current['Score'] <= 0) return;
             else
             {
                 $isBetter = $this->isAscending ? ($current['Score'] < $next['Score']) : ($current['Score'] > $next['Score']);
                 $shouldMoveUp = $next['Score'] <= 0 || $isBetter;
-            }
-            if ($shouldMoveUp)
-            {
-                $this->scores[$i - 1] = $current;
-                $this->scores[$i] = $next;
-            }
-            else
-            {
-                return;
+                if ($shouldMoveUp)
+                {
+                    $this->scores[$i - 1] = $current;
+                    $this->scores[$i] = $next;
+                }
             }
         }
     }
@@ -1180,6 +1171,7 @@ class Scores
         $index = array_search($login, $logins, true);
         if ($index === false)
         {
+            Log::debug("New score by {$login}: {$score}");
             $this->scores[] = array(
                 'Login' => $login,
                 'PlayerId' => $playerId,
@@ -1193,6 +1185,7 @@ class Scores
             $previousScore = $this->scores[$index]['Score'];
             if ($previousScore <= 0)
             {
+                Log::debug("New score by {$login}: {$previousScore}->{$score}");
                 $this->scores[$index] = array(
                     'Login' => $login,
                     'PlayerId' => $playerId,
@@ -1208,6 +1201,7 @@ class Scores
                     && ($this->isAscending ? ($score < $previousScore) : ($score > $previousScore));
                 if ($isImprovement)
                 {
+                    Log::debug("Improvement by {$login}: {$previousScore}->{$score}");
                     $this->scores[$index] = array(
                         'Login' => $login,
                         'PlayerId' => $playerId,
