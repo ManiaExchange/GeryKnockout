@@ -472,14 +472,25 @@ abstract class PlayerStatus
 
 
 /**
+ * Used to determine what happens in the event of someone getting knocked out
+ */
+abstract class KnockoutBehaviour
+{
+    const PlayDuringWarmup = 51;
+    const ForceSpec = 52;
+    const KickUntilTop5 = 53;
+}
+
+
+/**
  * Utility class for logging in the console window.
  */
 abstract class Log
 {
-    const Debug = 51;
-    const Information = 52;
-    const Warning = 53;
-    const Error = 54;
+    const Debug = 61;
+    const Information = 62;
+    const Warning = 63;
+    const Error = 64;
 
     private static function write($level, $message)
     {
@@ -533,16 +544,19 @@ abstract class Log
  */
 abstract class Actions
 {
+    // Defined by TMGery
     const ToggleHUD = 98;
     const Dismiss = 99;
-    const ConfirmOptOut = 420501;
-    const CliReferencePage1 = 420511;
-    const CliReferencePage2 = 420512;
-    const CliReferencePage3 = 420513;
+
+    // Knockout UI
+    const ConfirmOptOut = 420001;
+    const CliReferencePage1 = 420011;
+    const CliReferencePage2 = 420012;
+    const CliReferencePage3 = 420013;
 
     // Ranges
-    const SpectatePlayerMin = 421024;
-    const SpectatePlayerMax = 421279;
+    const SpectatePlayerMin = 421000;
+    const SpectatePlayerMax = 421255;
 }
 
 
@@ -1583,7 +1597,6 @@ class PlayerList
             if ($lives <= 1)
             {
                 $this->players[$login]['Lives'] = 0;
-                $this->players[$login]['Status'] = PlayerStatus::KnockedOut;
                 return true;
             }
             else
@@ -2450,6 +2463,7 @@ class KnockoutRuntime
     private $tiebreaker;
     private $maxFalseStarts;
     private $authorSkip;
+    private $koBehaviour;
 
     public function __construct($client)
     {
@@ -2485,6 +2499,7 @@ class KnockoutRuntime
         $this->tiebreaker = true;
         $this->maxFalseStarts = 2;
         $this->authorSkip = 7;
+        $this->koBehaviour = KnockoutBehaviour::PlayDuringWarmup;
     }
 
     /**
@@ -2953,15 +2968,13 @@ class KnockoutRuntime
 
     private function ko($login, $score)
     {
+        global $gbxclient;
+
         $player = $this->playerList->get($login);
-        $nickName = Text::highlight(
-            Text::trim($player['NickName']),
-            Text::InfoHighlight
-        );
+        $nickName = Text::highlight(Text::trim($player['NickName']), '');
         $isKO = $this->playerList->subtractLife($login);
         if ($isKO)
         {
-            forceSpec($login, true);
             $msg = $score > 0
                 ? "{$nickName} is KO by a worst place finish"
                 : "{$nickName} is KO by a DNF";
@@ -2969,6 +2982,26 @@ class KnockoutRuntime
             if (PlayerStatus::isDisconnected($player['Status']))
             {
                 $this->playerList->remove($login);
+            }
+            else
+            {
+                switch ($this->koBehaviour)
+                {
+                    case KnockoutBehaviour::PlayDuringWarmup:
+                        $this->playerList->setStatus($login, PlayerStatus::KnockedOut);
+                        forceSpec($login, true);
+                        break;
+                    case KnockoutBehaviour::ForceSpec:
+                        $this->playerList->setStatus($login, PlayerStatus::KnockedOutAndSpectating);
+                        forceSpec($login, true);
+                        break;
+                    case KnockoutBehaviour::KickUntilTop5:
+                        if (count($this->playerList->getPlayingOrShelved()) > 5)
+                        {
+                            $gbxclient->kick($login, 'You have been knocked out');
+                        }
+                        break;
+                }
             }
         }
         else
@@ -4649,6 +4682,43 @@ class KnockoutRuntime
     }
 
     /**
+     * Command to set the knockout behaviour. Called with admin privileges; arguments are not
+     * validated.
+     *
+     * Syntax: `/ko (behavior | behaviour) (playwarmup | forcespec | kick)`
+     */
+    private function cliKoBehaviour($args, $onError)
+    {
+        if (!isset($args[1]))
+        {
+            $onError('Syntax error: expected an argument (usage: $</ko behaviour (playwarmup | forcespec | kick)$>)');
+        }
+        elseif (isset($args[2]))
+        {
+            $onError('Syntax error: too many arguments (usage: $</ko behaviour (playwarmup | forcespec | kick)$>)');
+        }
+        elseif ($args[1] === 'playwarmup')
+        {
+            $this->koBehaviour = KnockoutBehaviour::PlayDuringWarmup;
+            Chat::info('Knockout behaviour has been set to $<Play during warmup$>');
+        }
+        elseif ($args[1] === 'forcespec')
+        {
+            $this->koBehaviour = KnockoutBehaviour::ForceSpec;
+            Chat::info('Knockout behaviour has been set to $<Force spec$>');
+        }
+        elseif ($args[1] === 'kick')
+        {
+            $this->koBehaviour = KnockoutBehaviour::KickUntilTop5;
+            Chat::info('Knockout behaviour has been set to $<Kick$>');
+        }
+        else
+        {
+            $onError(sprintf('Error: unexpected argument $<%s$> (expected $<playwarmup$>, $<forcespec$> or $<kick$>)', Text::sanitize($args[1])));
+        }
+    }
+
+    /**
      * Command to enable or disable open warmups. Called with admin privileges; arguments are not
      * validated.
      *
@@ -4957,6 +5027,11 @@ class KnockoutRuntime
                     $this->cliMulti($args, $onError);
                     break;
 
+                case 'behavior':
+                case 'behaviour':
+                    $this->cliKoBehaviour($args, $onError);
+                    break;
+
                 case 'openwarmup':
                     $this->cliOpenwarmup($args, $onError);
                     break;
@@ -5067,8 +5142,11 @@ class KnockoutRuntime
                     )),
 
                     implode($sep2, array(
-                        '/ko rounds $irounds$i',
-                        'Sets the number of rounds per track to play in Rounds.'
+                        '/ko behaviour (playwarmup | forcespec | kick)',
+                        'Determines what happens when a player gets knocked out.',
+                        '- Playwarmup: Knocked out players stay on the server and may play during warmups',
+                        '- Forcespec: Knocked out players are forced to spec and won\'t play during warmups',
+                        '- Kick: Players are kicked from the server until top 5.'
                     )),
 
                     implode($sep2, array(

@@ -115,14 +115,14 @@ This mode can be disabled using [/ko tiebreaker](https://github.com/ManiaExchang
 It is recommended to disable this mode if you intend to [play several rounds per track](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md#rounds-per-track).
 
 ### KO multiplier
-You can control how many KOs are performed each round by using a KO multiplier; useful if there are many players and limited time. These are the following multipliers that may be used:
+You can control how many KOs are performed each round by using a [KO multiplier](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none); useful if there are many players and limited time. These are the following multipliers that may be used:
 
 | Multiplier | Command | Description |
 | :-- | :-- | :-- |
-| None | [/ko multi none](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | No multiplier; 1 KO per round. |
-| Constant | [/ko multi constant *kos*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | A constant number of KOs per round. |
-| Extra | [/ko multi extra *per_x_players*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | An extra KO per X players. If `per_x_players` = 10 then there will be 1 KO for 2-10 players, 2 KOs for 11-20, 3 KOs for 21-30, and so on. |
-| Dynamic | [/ko multi dynamic *total_rounds*](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none) | A hybrid algorithm which aims for `total_rounds` rounds throughout the knockout. It starts off with 1 KO per round, then progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds. |
+| None | /ko multi none | No multiplier; 1 KO per round. |
+| Constant | /ko multi constant *kos* | A constant number of KOs per round. |
+| Extra | /ko multi extra *per_x_players* | An extra KO per X players. If `per_x_players` = 10 then there will be 1 KO for 2-10 players, 2 KOs for 11-20, 3 KOs for 21-30, and so on. |
+| Dynamic | /ko multi dynamic *total_rounds* | A hybrid algorithm which aims for `total_rounds` rounds throughout the knockout. It starts off with 1 KO per round, then progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds. |
 
 #### How the dynamic multiplier works
 Among these multipliers, Dynamic is without doubt the most advanced one, so let's take a moment to see how it works. In essence, it is about approximating the total number of KOs such that the total number of rounds equals the desired number of rounds.
@@ -144,6 +144,16 @@ Each round, the curve is recalculated to adjust for any inaccuracies. In the cas
 The base curve is defined in a way that there will always be 1 KO for the last 4-5 rounds, regardless of the player and KO count. Whether it will be 4 or 5 rounds depends on the possible solutions for the scaled curve. Because of the fact that we deal with discrete space, there is a small chance that the curve may not be solvable. In this case, the curve is readjusted ("smoothed") by 1 KO for that round only.
 
 Using this approach, we can observe that the number of KOs per round will increase and decrease steadily; the number will not increase, then decrease, then increase again (and vice versa), unless there are unexpected KOs.
+
+### Knockout behaviour
+
+You may adjust what happens when players get knocked out with the command [/ko behaviour](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-behaviour-playwarmup--forcespec--kick):
+
+Command | Description |
+| :-- | :-- |
+| /ko behaviour playwarmup | Players stay on the server and may play during warmups if [/ko openwarmup](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-openwarmup-on--off) is enabled. |
+| /ko behaviour forcespec | Players are forced to spec and won't play during warmups, even if [/ko openwarmup](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-openwarmup-on--off) is enabled. |
+| /ko behaviour kick | Players are kicked from the server when they get knocked out. Applies until top 5. |
 
 ### Lives
 Players may be configured to have multiple lives. This can be configured before the start of the knockout, or while a knockout is in progress. By default, each player has 1 life.
@@ -212,9 +222,17 @@ A confirmation window will appear when opting out to ensure that the player opts
 
 ## Upgrading from previous versions
 
+### From 2.x.x
+
+Version 3 requires version v2020-12-04 of TMGery. Installation now requires copying additional files `MethodsTmf.php` and `StructsTmf.php` to the `include` folder by unzipping the file into the TMGery folder.
+
+New admin commands:
+
+- /ko behaviour (playwarmup | forcespec | kick)
+
 ### From v.082.9
 
-Version 2.0.0 comes with some breaking changes. First, it requires a newer version of TMGery and the plugin manager, which support the `EndRound` callback. Without this callback, no KOs will be performed.
+Version 2 comes with some breaking changes. First, it requires version v2020-09-27 of TMGery and version 0.23 of the plugin manager, both have been updated to support the `EndRound` callback. Without this callback, no KOs will be performed.
 
 Secondly, there are also some changes concerning the CLI:
 
@@ -257,18 +275,6 @@ Removed commands:
 - /koJOIN *password*
 
 Because version 2.0.0 has significant changes to internal structure, `/ForcePlay [<login>]` and `/ForcePlayAll` does not put players into the knockout any longer. Use `/ko add <login>` and `/ko add *` instead. You may use `/ForceSpec [<login>]`, but `/ko remove <login>` is recommended as it has immediate effect.
-
-The following bugs have been fixed since v.082.9:
-
-- Fixed bug where the script will KO everyone when starting in the warmup.
-- Fixed bug where the script will KO everyone if it didn't execute until next track.
-- Fixed bug where you could avoid getting KO by going in spec between tracks.
-- Fixed bug where players could rejoin after being forced to spec.
-- Fixed bug where a player that has been forced in during warmup is not knocked out if last.
-- Fixed bug where forcing a player in as the third player will end the knockout afterwards.
-- Fixed bug where the winner of a previous knockout would be crowned as the winner when stopping a knockout manually.
-- Partially patched vulnerability where the script will KO everyone if `/restart` or `/gonext` is used.
-- Commands for starting a knockout, restarting a map and skipping a map now work when issued during the synchronization phase; these will take effect after a small delay (when the round starts).
 
 `/restart`, `/gonext` and `/end` can be used interchangeably with `/ko restart`, `/ko skip` and `/ko skip warmup` respectively, as long as no one has finished yet. Though, the new commands offer new functionality such as restarting the current track with a warmup (using `/ko restart warmup`), protection against unwanted KOs if someone have finished, and proper state management (status is reflected in the top bar).
 

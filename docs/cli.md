@@ -86,6 +86,14 @@ Note: adjusting the multiplier is not possible during a tiebreaker.
 
 Default: None
 
+### /ko behaviour (playwarmup | forcespec | kick)
+Determines what happens when a player gets knocked out:
+- Playwarmup: Knocked out players stay on the server and may play during warmups if `/ko openwarmup` is enabled.
+- Forcespec: Knocked out players are forced to spec and won't play during warmups, even if `/ko openwarmup` is enabled.
+- Kick: Players are kicked from the server when they get knocked out. Applies until top 5.
+
+Default: on
+
 ### /ko openwarmup (on | off)
 Enables or disables open warmup which lets knocked out players play during warmup.
 
