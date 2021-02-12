@@ -9,11 +9,11 @@ This repository contains a plugin for TMGery that enables knockout competitions 
 ## Prerequisites
 - Trackmania Forever dedicated server
 - PHP 5.3 or later
-- TMGery v2020-09-27 or later
+- TMGery v2020-12-04 or later
 - DedDerek's plugin manager 0.23 or later
 
 ## Installation
-Copy the contents of `plugins` to the plugins folder of your TMGery installation, then append the following to `plugins.txt`:
+Unzip [the latest release](https://github.com/ManiaExchange/GeryKnockout/releases) into your TMGery installation, then append the following to `plugins.txt`:
 
 ```
 plugins\plugin.knockout.php

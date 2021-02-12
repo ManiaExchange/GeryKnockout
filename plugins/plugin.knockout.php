@@ -1087,24 +1087,20 @@ class Scores
 
     private function getComparator()
     {
-        if ($this->isAscending)
+        $ascending = $this->isAscending;
+        return function($a, $b) use($ascending)
         {
-            return function($a, $b)
+            if ($a['Checkpoint'] < $b['Checkpoint']) return 1;
+            elseif ($a['Checkpoint'] > $b['Checkpoint']) return -1;
+            else
             {
                 if ($b['Score'] <= 0) return -1;
                 elseif ($a['Score'] <= 0) return 1;
-                else return $a['Score'] < $b['Score'] ? -1 : 1;
-            };
-        }
-        else
-        {
-            return function($a, $b)
-            {
-                if ($b['Score'] <= 0) return -1;
-                elseif ($a['Score'] <= 0) return 1;
+                elseif ($a['Score'] === $b['Score']) return 0;
+                elseif ($ascending) return $a['Score'] < $b['Score'] ? -1 : 1;
                 else return $a['Score'] > $b['Score'] ? -1 : 1;
-            };
-        }
+            }
+        };
     }
 
     /**
@@ -1122,6 +1118,8 @@ class Scores
                 'Login' => $player['Login'],
                 'PlayerId' => $player['PlayerId'],
                 'NickName' => $player['NickName'],
+                'Checkpoint' => 0,
+                'IsFinish' => true,
                 'Score' => 0
             );
         };
@@ -1137,16 +1135,12 @@ class Scores
         {
             $current = $this->scores[$i];
             $next = $this->scores[$i - 1];
-            if ($current['Score'] <= 0) return;
-            else
+            $isBetter = $this->isAscending ? ($current['Score'] < $next['Score']) : ($current['Score'] > $next['Score']);
+            $shouldMoveUp = $next['Score'] <= 0 || $isBetter;
+            if ($shouldMoveUp)
             {
-                $isBetter = $this->isAscending ? ($current['Score'] < $next['Score']) : ($current['Score'] > $next['Score']);
-                $shouldMoveUp = $next['Score'] <= 0 || $isBetter;
-                if ($shouldMoveUp)
-                {
-                    $this->scores[$i - 1] = $current;
-                    $this->scores[$i] = $next;
-                }
+                $this->scores[$i - 1] = $current;
+                $this->scores[$i] = $next;
             }
         }
     }
@@ -1161,8 +1155,10 @@ class Scores
      * @param int $playerId The player UID.
      * @param string $nickName The nickname of the player.
      * @param int $score The player's score.
+     * @param int $checkpoint The checkpoint index currently crossed.
+     * @param bool $isFinish Whether the score represents a finished run.
      */
-    public function submitScore($login, $playerId, $nickName, $score)
+    public function submitScore($login, $playerId, $nickName, $score, $checkpoint, $isFinish = true)
     {
         $logins = array_map(
             function($score) { return $score['Login']; },
@@ -1171,45 +1167,36 @@ class Scores
         $index = array_search($login, $logins, true);
         if ($index === false)
         {
-            Log::debug("New score by {$login}: {$score}");
+            Log::debug("New score by {$login}: CP {$checkpoint}, Score {$score}");
             $this->scores[] = array(
                 'Login' => $login,
                 'PlayerId' => $playerId,
                 'NickName' => $nickName,
+                'Checkpoint' => $checkpoint,
+                'IsFinish' => $isFinish,
                 'Score' => $score
             );
-            $this->sort(count($this->scores) - 1);
+            if ($score > 0) $this->sort(count($this->scores) - 1);
         }
-        else
+        elseif ($score > 0)
         {
+            $previousCheckpoint = $this->scores[$index]['Checkpoint'];
             $previousScore = $this->scores[$index]['Score'];
-            if ($previousScore <= 0)
+            $isImprovement =
+                ($checkpoint > $previousCheckpoint)
+                || ($checkpoint === $previousCheckpoint && $this->isAscending ? ($score < $previousScore) : ($score > $previousScore));
+            if ($isImprovement)
             {
-                Log::debug("New score by {$login}: {$previousScore}->{$score}");
+                Log::debug("Improvement by {$login}: CP {$previousCheckpoint}->{$checkpoint}, Score {$previousScore}->{$score}");
                 $this->scores[$index] = array(
                     'Login' => $login,
                     'PlayerId' => $playerId,
                     'NickName' => $nickName,
+                    'Checkpoint' => $checkpoint,
+                    'IsFinish' => $isFinish,
                     'Score' => $score
                 );
                 $this->sort($index);
-            }
-            else
-            {
-                $isImprovement =
-                    ($score > 0)
-                    && ($this->isAscending ? ($score < $previousScore) : ($score > $previousScore));
-                if ($isImprovement)
-                {
-                    Log::debug("Improvement by {$login}: {$previousScore}->{$score}");
-                    $this->scores[$index] = array(
-                        'Login' => $login,
-                        'PlayerId' => $playerId,
-                        'NickName' => $nickName,
-                        'Score' => $score
-                    );
-                    $this->sort($index);
-                }
             }
         }
     }
@@ -1293,7 +1280,7 @@ class Scores
      * @param string $nickName The nickname of the player.
      * @param int $score The time or score of the player.
      */
-    public function set($login, $playerId, $nickName, $score)
+    public function set($login, $playerId, $nickName, $score, $checkpoint)
     {
         $logins = array_map(
             function($player) { return $player['Login']; },
@@ -1302,7 +1289,7 @@ class Scores
         $index = array_search($login, $logins, true);
         if ($index === false)
         {
-            $this->submitScore($login, $playerId, $nickName, $score);
+            $this->submitScore($login, $playerId, $nickName, $score, $checkpoint);
         }
         else
         {
@@ -1310,6 +1297,7 @@ class Scores
                 'Login' => $login,
                 'PlayerId' => $playerId,
                 'NickName' => $nickName,
+                'Checkpoint' => $checkpoint,
                 'Score' => $score
             );
             uasort($this->scores, $this->getComparator());
@@ -1761,7 +1749,7 @@ abstract class UI
         }
     }
 
-    private static function scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers)
+    private static function scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers, $bestCPs)
     {
         $pointOfNoReturn = $numberOfPlayers - $numberOfKOs;
         $getPlacementColor = function($score, $index) use($pointOfNoReturn)
@@ -1780,14 +1768,23 @@ abstract class UI
             $seconds = ($milliseconds / 1000) % 60;
             $minutes = ($milliseconds / 60000) % 60;
             $hours = ($milliseconds / 3600000) % 24;
-            if ($hours >= 1)
-            {
-                return sprintf('%d:%02d:%02d.%02d', $hours, $minutes, $seconds, $centiseconds);
-            }
-            else
-            {
-                return sprintf('%d:%02d.%02d', $minutes, $seconds, $centiseconds);
-            }
+            if ($hours >= 1) return sprintf('%d:%02d:%02d.%02d', $hours, $minutes, $seconds, $centiseconds);
+            else return sprintf('%d:%02d.%02d', $minutes, $seconds, $centiseconds);
+        };
+        $formatDistanceToLeader = function($yourMs, $leaderMs)
+        {
+            $difference = $yourMs - $leaderMs;
+            $sign = '';
+            if ($difference > 0) $sign = '+';
+            elseif ($difference < 0) $sign = '-';
+            $distance = abs($difference);
+            $centiseconds = ($distance / 10) % 100;
+            $seconds = ($distance / 1000) % 60;
+            $minutes = ($distance / 60000) % 60;
+            $hours = ($distance / 3600000) % 24;
+            if ($hours >= 1) return sprintf('%s%d:%02d:%02d.%02d', $sign, $hours, $minutes, $seconds, $centiseconds);
+            elseif ($minutes >= 1) return sprintf('%s%d:%02d.%02d', $sign, $minutes, $seconds, $centiseconds);
+            else return sprintf('%s%d.%02d', $sign, $seconds, $centiseconds);
         };
         $positionWidth = function($position)
         {
@@ -1803,24 +1800,58 @@ abstract class UI
         $scoreWidth = function($score)
         {
             $length = strlen($score);
-            if ($length >= 10) return 8.3;      // 1:00:00.00 +
+            if ($length >= 10) return 8.6;      // 1:00:00.00 +
+            elseif ($length >= 9) return 7.8;   //  +10:00.00
             elseif ($length >= 8) return 7.0;   //   10:00.00
-            elseif ($length >= 7) return 6.0;   //    1:00.00
-            else return 4.3;                    //        DNF
+            elseif ($length >= 7) return 6.2;   //    1:00.00
+            elseif ($length >= 6) return 5.4;   //     +10.00
+            elseif ($length >= 5) return 4.6;   //      +1.00
+            elseif ($length >= 4) return 3.8;   //       0.00
+            else return 3.0;                    //        DNF
+        };
+        $checkpointWidth = function($cp)
+        {
+            switch (strlen($cp))
+            {
+                case 1: return 0.6;    // 1
+                case 2: return 1.5;    // 10
+                case 3: return 2.4;    // 100
+                case 4: return 3.3;    // 1000
+                default: return 4.2;   // 10000 +
+            }
         };
 
-        $format = function($timeOrScore) use($gameMode, $formatTime)
+        $format = function($placement, $checkpoint, $timeOrScore, $isFinish) use($gameMode, $formatTime, $formatDistanceToLeader, $bestCPs)
         {
-            if ($gameMode === GameMode::Stunts)
+            if ($isFinish)
             {
-                return $timeOrScore;
+                if ($gameMode === GameMode::Stunts)
+                {
+                    return $timeOrScore;
+                }
+                else
+                {
+                    if ($timeOrScore > 0) return $formatTime($timeOrScore);
+                    elseif ($timeOrScore === Scores::HasNotFinishedYet) return '0:00.00';
+                    elseif ($timeOrScore === Scores::DidNotFinish) return 'DNF';
+                    else return '';
+                }
             }
             else
             {
-                if ($timeOrScore > 0) return $formatTime($timeOrScore);
-                elseif ($timeOrScore === Scores::HasNotFinishedYet) return '0:00.00';
-                elseif ($timeOrScore === Scores::DidNotFinish) return 'DNF';
-                else return '';
+                if ($gameMode === GameMode::Stunts)
+                {
+                    return "\$i{$timeOrScore}";
+                }
+                elseif ($placement === 1)
+                {
+                    return '$i' . $formatTime($timeOrScore);
+                }
+                else
+                {
+                    $bestCP = array_key_exists($checkpoint, $bestCPs) ? $bestCPs[$checkpoint] : $timeOrScore;
+                    return '$i' . $formatDistanceToLeader($timeOrScore, $bestCP);
+                }
             }
         };
 
@@ -1832,7 +1863,7 @@ abstract class UI
         $padding = $notFinished > 0 ? array_fill(0, $notFinished, null) : array();
         $scoresFormatted = array_merge($nonDNFs, $padding, $DNFs);
 
-        $box = function($index, $row) use($scoresFormatted, $getPlacementColor, $format, $positionWidth, $scoreWidth)
+        $box = function($index, $row) use($scoresFormatted, $getPlacementColor, $format, $positionWidth, $scoreWidth, $checkpointWidth, $gameMode)
         {
             if (array_key_exists($index, $scoresFormatted))
             {
@@ -1842,19 +1873,37 @@ abstract class UI
                 $placement = $index + 1;
                 $posWidth = $positionWidth($placement);
                 $nickName = $score['NickName'];
-                $scoreText = $format($score['Score']);
+                $scoreText = $format($placement, $score['Checkpoint'], $score['Score'], $score['IsFinish']);
                 $scrWidth = $scoreWidth($scoreText);
                 // Encode manialink ID with the target playerID
                 $action = Actions::SpectatePlayerMin + $score['PlayerId'];
-                return '
-                    <frame posn="-12 ' . $height . ' 1">
-                        <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $color . '" />
-                        <label posn="-11 0 1" sizen="' . $posWidth . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $placement . '." />
-                        <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $scrWidth) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
-                        <label posn="11 0 1" sizen="' . $scrWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $scoreText . '" />
-                        <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" action="' . $action . '" />
-                    </frame>
-                ';
+                if ($gameMode === GameMode::Laps)
+                {
+                    $cpText = $score['Checkpoint'];
+                    $cpWidth = $checkpointWidth($cpText);
+                    return '
+                        <frame posn="-12 ' . $height . ' 1">
+                            <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $color . '" />
+                            <label posn="-11 0 1" sizen="' . $posWidth . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $placement . '." />
+                            <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $scrWidth - $cpWidth) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
+                            <label posn="' . (10.5 - $cpWidth) . ' 0 1" sizen="' . $scrWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $scoreText . '" />
+                            <label posn="11 0 1" sizen="' . $cpWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $cpText . '" />
+                            <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" action="' . $action . '" />
+                        </frame>
+                    ';
+                }
+                else
+                {
+                    return '
+                        <frame posn="-12 ' . $height . ' 1">
+                            <quad posn="-12 0 1" sizen="0.2 4" halign="left" valign="center" bgcolor="' . $color . '" />
+                            <label posn="-11 0 1" sizen="' . $posWidth . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $placement . '." />
+                            <label posn="' . (-10.5 + $posWidth) . ' 0 1" sizen="' . (21 - $posWidth - $scrWidth) . ' 4" halign="left" valign="center" scale="1.0" text="$fff' . $nickName . '" />
+                            <label posn="11 0 1" sizen="' . $scrWidth . ' 4" halign="right" valign="center" scale="1.0" text="$fff' . $scoreText . '" />
+                            <quad posn="0 0 0" sizen="24 4" halign="center" valign="center" bgcolor="3338" action="' . $action . '" />
+                        </frame>
+                    ';
+                }
             }
             else
             {
@@ -1915,12 +1964,12 @@ abstract class UI
      * @param string|array $logins [Optional] The login or logins to display the scoreboard for. If
      * null, the scoreboard is displayed for everyone.
      */
-    public static function updateScoreboard($scores, $gameMode, $numberOfKOs, $numberOfPlayers, $logins = null)
+    public static function updateScoreboard($scores, $gameMode, $numberOfKOs, $numberOfPlayers, $bestCPs, $logins = null)
     {
         global $gbxclient;
         Log::debug('updating scoreboard...');
 
-        $manialink = self::scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers);
+        $manialink = self::scoreboardManialink($scores, $gameMode, $numberOfKOs, $numberOfPlayers, $bestCPs);
         if (is_null($logins))
         {
             $gbxclient->sendDisplayManialinkPage($manialink, 0, false);
@@ -2440,6 +2489,10 @@ class KnockoutRuntime
     /** @var Results $results */
     private $results;
 
+    // Laps state
+    private $bestCPs;
+    private $scheduleKo;
+
     // Server info
     private $isWarmup;
     private $isPodium;
@@ -2478,6 +2531,9 @@ class KnockoutRuntime
         $this->shouldCheckForFalseStarts = false;
         $this->kosThisRound = 0;
         $this->results = null;
+
+        $this->bestCPs = array();
+        $this->scheduleKo = false;
 
         $this->isWarmup = false;
         $this->isPodium = false;
@@ -2577,7 +2633,7 @@ class KnockoutRuntime
             $scores = $this->scores->getSortedScores();
             $nbKOs = $this->kosThisRound;
             $numberOfPlayers = $this->playerList->countPlaying();
-            UI::updateScoreboard($scores, $this->gameMode, $nbKOs, $numberOfPlayers, $login);
+            UI::updateScoreboard($scores, $this->gameMode, $nbKOs, $numberOfPlayers, $this->bestCPs, $login);
         }
     }
 
@@ -2807,8 +2863,8 @@ class KnockoutRuntime
     }
 
     /**
-     * Returns true if there is a live round ongoing. Will return false if it's currently a warmup,
-     * a podium or the knockout is not running.
+     * Returns true if there is a live round ongoing. Will return false if the knockout is not
+     * running, there is currently a warmup or the podium is displayed.
      */
     private function isLive()
     {
@@ -2960,6 +3016,12 @@ class KnockoutRuntime
         );
     }
 
+    /**
+     * Removes a life from the given player. If the player loses their last life, they get knocked
+     * out and their result logged.
+     *
+     * @return bool True if the player was knocked out as a result.
+     */
     private function ko($login, $score)
     {
         global $gbxclient;
@@ -2996,7 +3058,12 @@ class KnockoutRuntime
                         }
                         break;
                 }
+                if ($this->gameMode === GameMode::Laps)
+                {
+                    $this->scores->remove($login);
+                }
             }
+            $this->results->insert($login, $nickName, $this->roundNumber, $score);
         }
         else
         {
@@ -3007,7 +3074,7 @@ class KnockoutRuntime
             Chat::info($msg);
         }
         $this->updateStatusBar($login);
-        $this->results->insert($login, $nickName, $this->roundNumber, $score);
+        return $isKO;
     }
 
     /**
@@ -3087,7 +3154,7 @@ class KnockoutRuntime
         {
             if ($this->scores->get($login) === false)
             {
-                $this->scores->submitScore($login, $player['PlayerId'], $player['NickName'], Scores::DidNotFinish);
+                $this->scores->submitScore($login, $player['PlayerId'], $player['NickName'], Scores::DidNotFinish, 0);
             }
         }
         $scores = $this->scores->getSortedScores();
@@ -3409,9 +3476,11 @@ class KnockoutRuntime
             }
         }
 
+        $this->bestCPs = array();
+
         if ($this->koStatus === KnockoutStatus::Running || $this->koStatus === KnockoutStatus::Tiebreaker)
         {
-            if ($this->gameMode === GameMode::Stunts || $this->gameMode === GameMode::TimeAttack)
+            if ($this->gameMode === GameMode::Stunts || $this->gameMode === GameMode::TimeAttack || $this->gameMode === GameMode::Laps)
             {
                 $this->scores->initialize($this->playerList->getPlaying());
                 $this->updateScoreboard();
@@ -3595,7 +3664,7 @@ class KnockoutRuntime
         {
             case PlayerStatus::Playing:
                 $this->playerList->setStatus($login, PlayerStatus::PlayingAndDisconnected);
-                $this->scores->submitScore($login, $player['PlayerId'], $player['NickName'], 0);
+                $this->scores->submitScore($login, $player['PlayerId'], $player['NickName'], Scores::DidNotFinish, 0);
                 $this->updateScoreboard();
                 break;
 
@@ -3635,6 +3704,71 @@ class KnockoutRuntime
     public function onPlayerCheckpoint($args)
     {
         Log::debug(sprintf('onPlayerCheckpoint %s', implode(' ', $args)));
+        if (!$this->isLive()) return;
+
+        $playerId = $args[0];
+        $login = $args[1];
+        $timeOrScore = $args[2];
+        $cpIndex = $args[4];
+        $playerObj = $this->playerList->get($login);
+        $nickName = $playerObj['NickName'];
+
+        switch ($this->gameMode)
+        {
+            case GameMode::Stunts:
+                $this->bestCPs[$cpIndex] = max($this->bestCPs[$cpIndex], $timeOrScore);
+                break;
+
+            default:
+                $this->bestCPs[$cpIndex] = min($this->bestCPs[$cpIndex], $timeOrScore);
+                break;
+        }
+
+        if ($this->gameMode === GameMode::Laps)
+        {
+            $this->scores->submitScore($login, $playerId, $nickName, $timeOrScore, $cpIndex, false);
+            $scores = $this->scores->getSortedScores();
+            $length = count($scores);
+
+            // Once this becomes true, every subsequent player is knocked out
+            $shouldKnockOutPlayersBelow = false;
+
+            // Check for each player if they have reached enough laps to KO those below
+            // Example with 10 players and 5 laps:
+            // - 1st-4th: no KOs
+            // - 5th: KO scheduled when completing lap 5
+            // - 6th: KO scheduled when completing lap 4
+            // - 7th: KO scheduled when completing lap 3
+            // - 8th: KO scheduled when completing lap 2
+            // - 9th: KO scheduled when completing lap 1
+            for ($i = 0; $i < $length; $i += 1)
+            {
+                $score = $scores[$i];
+
+                if (true /* If we know everyone is in next lap and we can KO immediately */)
+                {
+                    $this->ko($login, $this->scores->get($login));
+                    $this->scheduleKo = false;
+                }
+                else
+                {
+                    $this->scheduleKo = microtime(true) + 1;
+                }
+            }
+            if (true /* If only one player remain */)
+            {
+                $leader = array_pop($remainingPlayers);
+                $this->results->insert($leader['Login'], $leader['NickName'], $this->roundNumber, $scores[0]['Score']);
+                Chat::info(sprintf("$<%s$> is the Champ!", Text::trim($leader['NickName'])));
+                $this->results->export();
+                $this->stop();
+                Log::information('Knockout completed');
+            }
+            else
+            {
+                $this->updateScoreboard();
+            }
+        }
     }
 
     /**
@@ -3656,84 +3790,58 @@ class KnockoutRuntime
     {
         global $gbxclient;
         Log::debug(sprintf('onPlayerFinish %s', implode(' ', $args)));
+        if (!$this->isLive()) return;
 
         $login = $args[1];
         $timeOrScore = $args[2];
 
-        switch ($this->koStatus)
+        // Check if it's the first player to retire and whether a false start can be
+        // considered
+        if ($this->shouldCheckForFalseStarts
+            && $this->gameMode !== GameMode::Stunts
+            && $this->gameMode !== GameMode::TimeAttack
+            && $timeOrScore === 0
+            && $this->falseStartCount < $this->maxFalseStarts)
         {
-            case KnockoutStatus::Idle:
-            case KnockoutStatus::Starting:
-            case KnockoutStatus::StartingNow:
-            case KnockoutStatus::Warmup:
-            case KnockoutStatus::SkippingWarmup:
-            case KnockoutStatus::SkippingTrack:
-            case KnockoutStatus::RestartingRound:
-            case KnockoutStatus::RestartingTrack:
-                // Do nothing
-                break;
-
-            case KnockoutStatus::Running:
-            case KnockoutStatus::Tiebreaker:
-                // Check if it's the first player to retire and whether a false start can be
-                // considered
-                if ($this->shouldCheckForFalseStarts
-                    && $this->gameMode !== GameMode::Stunts
-                    && $this->gameMode !== GameMode::TimeAttack
-                    && $timeOrScore === 0
-                    && $this->falseStartCount < $this->maxFalseStarts)
+            // Must be within 2.5 seconds of the start of the round
+            $currentTime = microtime(true);
+            if ($currentTime - $this->roundStartTime <= 2.5)
+            {
+                // Must be a player in the knockout who retires
+                if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
                 {
-                    // Must be within 2.5 seconds of the start of the round
-                    $currentTime = microtime(true);
-                    if ($currentTime - $this->roundStartTime <= 2.5)
-                    {
-                        // Must be a player in the knockout who retires
-                        if ($this->playerList->hasStatus($login, PlayerStatus::Playing))
-                        {
-                            $this->koStatus = KnockoutStatus::RestartingRound;
-                            $this->falseStartCount++;
-                            $gbxclient->forceEndRound();
-                            $text = "False start! Restarting the round... ({$this->falseStartCount}/{$this->maxFalseStarts})";
-                            Chat::info($text);
-                            UI::showMessage($text, 5);
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        $this->shouldCheckForFalseStarts = false;
-                    }
+                    $this->koStatus = KnockoutStatus::RestartingRound;
+                    $this->falseStartCount++;
+                    $gbxclient->forceEndRound();
+                    $text = "False start! Restarting the round... ({$this->falseStartCount}/{$this->maxFalseStarts})";
+                    Chat::info($text);
+                    UI::showMessage($text, 5);
+                    return;
                 }
-                else
-                {
-                    $this->shouldCheckForFalseStarts = false;
-                }
+            }
+        }
+        $this->shouldCheckForFalseStarts = false;
 
-                if (($this->serverStatus === ServerStatus::Play || $this->serverStatus === ServerStatus::Finish)
-                    && $this->playerList->hasStatus($login, PlayerStatus::Playing))
+        if (($this->serverStatus === ServerStatus::Play || $this->serverStatus === ServerStatus::Finish)
+            && $this->playerList->hasStatus($login, PlayerStatus::Playing))
+        {
+            $playerObj = $this->playerList->get($login);
+            if ($timeOrScore === 0)
+            {
+                switch ($this->gameMode)
                 {
-                    $playerObj = $this->playerList->get($login);
-                    if ($timeOrScore === 0)
-                    {
-                        switch ($this->gameMode)
-                        {
-                            case GameMode::Stunts:
-                            case GameMode::TimeAttack:
-                                $timeOrScore = Scores::HasNotFinishedYet;
-                                break;
+                    case GameMode::Stunts:
+                    case GameMode::TimeAttack:
+                        $timeOrScore = Scores::HasNotFinishedYet;
+                        break;
 
-                            case GameMode::Cup:
-                            case GameMode::Team:
-                            case GameMode::Laps:
-                            case GameMode::Rounds:
-                                $timeOrScore = Scores::DidNotFinish;
-                                break;
-                        }
-                    }
-                    $this->scores->submitScore($login, $playerObj['PlayerId'], $playerObj['NickName'], $timeOrScore);
-                    $this->updateScoreboard();
+                    default:
+                        $timeOrScore = Scores::DidNotFinish;
+                        break;
                 }
-                break;
+            }
+            $this->scores->submitScore($login, $playerObj['PlayerId'], $playerObj['NickName'], $timeOrScore, $this->nbCheckpoints * $this->nbLaps);
+            $this->updateScoreboard();
         }
     }
 
@@ -3827,6 +3935,7 @@ class KnockoutRuntime
 
             case KnockoutStatus::Running:
             case KnockoutStatus::Tiebreaker:
+                if ($this->gameMode === GameMode::Laps) return;
                 $scores = $this->scores->getSortedScores();
                 $noOneFinished = true;
                 foreach ($scores as $score)
@@ -3977,6 +4086,30 @@ class KnockoutRuntime
                 $this->scores->reset();
                 UI::hideScoreboard();
                 break;
+        }
+    }
+
+    /**
+     * Callback method for the main loop, called continuously.
+     */
+    public function onMainLoop()
+    {
+        if (!$this->isLive()) return;
+
+        if ($this->gameMode === GameMode::Laps && $this->scheduleKo !== false)
+        {
+            // If it's been a second since a KO was issued, start knocking out bottom players
+            $now = microtime(true);
+            if ($now > $this->scheduleKo)
+            {
+                $index = $this->scheduleKoBy;
+                $scoresGettingKnockedOut = array_reverse(array_slice($this->scores->getSortedScores(), $index));
+                foreach ($scoresGettingKnockedOut as $score)
+                {
+                    $this->ko($score['Login'], $score['Score']);
+                }
+                $this->scheduleKo = false;
+            }
         }
     }
 
@@ -5344,7 +5477,7 @@ class KnockoutRuntime
                 if (($this->koStatus === KnockoutStatus::Running && !$this->isPodium)
                     || ($this->koStatus === KnockoutStatus::Tiebreaker && $playerObj['Status'] === PlayerStatus::Playing))
                 {
-                    $this->scores->set($login, $playerObj['PlayerId'], $playerObj['NickName'], Scores::DidNotFinish);
+                    $this->scores->set($login, $playerObj['PlayerId'], $playerObj['NickName'], Scores::DidNotFinish, 0);
                 }
                 else
                 {
@@ -5394,8 +5527,52 @@ class KnockoutRuntime
         $login = $issuer[0];
         if (isadmin($login))
         {
-            if ($args[0]) $gbxclient->setWarmUp(true);
-            else $gbxclient->setWarmUp(false);
+            if (!$args[0])
+            {
+                $scores = array(
+                    array(
+                        'Login' => 'voyager006',
+                        'PlayerId' => 251,
+                        'NickName' => '$bbbVoyager$fa00$f900$f806',
+                        'Checkpoint' => 2,
+                        'IsFinish' => false,
+                        'Score' => 30000
+                    ),
+                    array(
+                        'Login' => 'eyebo',
+                        'PlayerId' => 249,
+                        'NickName' => '$fffm$09fx$000.$f90eyebo',
+                        'Checkpoint' => 1,
+                        'IsFinish' => false,
+                        'Score' => 22000
+                    ),
+                );
+                $bestCPs = array(10000, 20000, 30000);
+                UI::updateScoreboard($scores, GameMode::Laps, 1, count($scores), $bestCPs, $login);
+            }
+            else
+            {
+                $scores = array(
+                    array(
+                        'Login' => 'voyager006',
+                        'PlayerId' => 251,
+                        'NickName' => '$bbbVoyager$fa00$f900$f806',
+                        'Checkpoint' => 3,
+                        'IsFinish' => true,
+                        'Score' => 40000
+                    ),
+                    array(
+                        'Login' => 'eyebo',
+                        'PlayerId' => 249,
+                        'NickName' => '$fffm$09fx$000.$f90eyebo',
+                        'Checkpoint' => 4,
+                        'IsFinish' => true,
+                        'Score' => 52000
+                    ),
+                );
+                $bestCPs = array(10000, 20000, 30000, 40000);
+                UI::updateScoreboard($scores, GameMode::Laps, 1, count($scores), $bestCPs, $login);
+            }
             Chat::info2('test done', $login);
         }
         else
@@ -5409,18 +5586,19 @@ $gbxclient = new Client($client);
 
 $this->AddPlugin(new KnockoutRuntime($gbxclient));
 
-$this->AddEvent('onStartup', 'onControllerStartup');
-$this->AddEvent('BeginRound', 'onBeginRound');
 $this->AddEvent('BeginRace', 'onBeginRace');
-$this->AddEvent('EndRound', 'onEndRound');
+$this->AddEvent('BeginRound', 'onBeginRound');
 $this->AddEvent('EndRace', 'onEndRace');
+$this->AddEvent('EndRound', 'onEndRound');
+$this->AddEvent('onStartup', 'onControllerStartup');
+$this->AddEvent('onMainLoop', 'onMainLoop');
+$this->AddEvent('PlayerCheckpoint', 'onPlayerCheckpoint');
 $this->AddEvent('PlayerConnect', 'onPlayerConnect');
 $this->AddEvent('PlayerDisconnect', 'onPlayerDisconnect');
-$this->AddEvent('PlayerCheckpoint', 'onPlayerCheckpoint');
 $this->AddEvent('PlayerFinish', 'onPlayerFinish');
 $this->AddEvent('PlayerInfoChanged', 'onPlayerInfoChange');
-$this->AddEvent('StatusChanged', 'onStatusChange');
 $this->AddEvent('PlayerManialinkPageAnswer', 'playerManialinkPageAnswer');
+$this->AddEvent('StatusChanged', 'onStatusChange');
 
 $this->addChatCommand('ko', true, 'adminChatCommands');
 $this->addChatCommand('opt', true, 'optChatCommand');

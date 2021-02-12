@@ -6,11 +6,29 @@ With this plugin installed, you can run and manage knockout events on your dedic
 ## The knockout format
 The knockout is based on knocking out the slowest drivers each round. If there is 1 KO per round, the last player will be knocked out. With 2 KOs, the bottom two are knocked out.
 
-If players do not finish (DNF), they will also be knocked out. This has the side effect that multiple players may be knocked out, even if there is only supposed to be 1 KO per round.
+If players do not finish (DNF), they will also be knocked out. This has the side effect that multiple players may be knocked out, even if there is only supposed to be 1 KO per round. If no one is able to finish in time, there won't be any KOs.
 
 This is then repeated until there is one player remaining. This player is the only one who has not been knocked out and is therefore crowned as the winner.
 
-Supported game modes include Rounds, Time Attack and Stunts. Laps, Cup and Team are currently not supported.
+Supported game modes include Time Attack, Rounds, Stunts and Laps. Cup and Team are currently not supported.
+
+### Time Attack
+
+In Time Attack, players have a set time to finish their runs, and can restart at any time. KOs are performed once the time runs out.
+
+### Rounds
+
+In Rounds, players start at the same time and are given one run to finish. KOs are performed for each round and the number of rounds depend on the mode settings. Point distribution is overridden to reward each surviving player 1 point, thus the number of rounds equals the points limit (or until one player remain, whichever happens first). Multiple rounds per track is supported.
+
+Theoretically, Rounds with new rules should be supported, although this has not been tested properly.
+
+### Stunts
+
+In Stunts, players compete for the highest score in a Time Attack-like fashion. KOs are performed once the time runs out.
+
+### Laps
+
+In Laps, players start at the same time on a multilap track. KOs are performed for each lap, with the slowest driver being knocked out when the player ahead crosses the line. If there is a set number of laps per track, then the number of KOs will equal the number of laps, and when completed, the competition will continue on the next track with the remaining players.
 
 ## Command-line interface
 The plugin includes a command-line interface which can be used to configure the knockout.
@@ -110,9 +128,9 @@ In this case, player 20 will be knocked out regardless. However, players 4, 9 an
 
 Tiebreakers will not initiate if the tied players DNF. If there is a tie for last spot(s) in a tiebreaker, another tiebreaker will be initiated with the tied players only.
 
-This mode can be disabled using [/ko tiebreaker](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off). If disabled, ties are broken by when they were submitted; times which are set earlier are preferred.
+This mode can be disabled using [/ko tiebreaker](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-tiebreaker-on--off). If disabled, ties are broken by when they were submitted; times which are set earlier are preferred. It is recommended to disable this mode if you intend to [play several rounds per track](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md#rounds-per-track).
 
-It is recommended to disable this mode if you intend to [play several rounds per track](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/user-guide.md#rounds-per-track).
+Tiebreakers are not supported in Laps mode.
 
 ### KO multiplier
 You can control how many KOs are performed each round by using a [KO multiplier](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-multi-constant-kos--extra-per_x_players--dynamic-total_rounds--none); useful if there are many players and limited time. These are the following multipliers that may be used:
@@ -123,6 +141,8 @@ You can control how many KOs are performed each round by using a [KO multiplier]
 | Constant | /ko multi constant *kos* | A constant number of KOs per round. |
 | Extra | /ko multi extra *per_x_players* | An extra KO per X players. If `per_x_players` = 10 then there will be 1 KO for 2-10 players, 2 KOs for 11-20, 3 KOs for 21-30, and so on. |
 | Dynamic | /ko multi dynamic *total_rounds* | A hybrid algorithm which aims for `total_rounds` rounds throughout the knockout. It starts off with 1 KO per round, then progressively increases the KO count towards the middle and goes gradually back down to 1 KO for the final rounds. |
+
+KO multipliers do not apply in Laps mode.
 
 #### How the dynamic multiplier works
 Among these multipliers, Dynamic is without doubt the most advanced one, so let's take a moment to see how it works. In essence, it is about approximating the total number of KOs such that the total number of rounds equals the desired number of rounds.
@@ -163,7 +183,7 @@ When a player gets last, they will lose a life. If it was their last life, they 
 The command to use is [/ko lives (*login* | *) [[+ | -]*lives*]](https://github.com/ManiaExchange/GeryKnockout/blob/main/docs/cli.md#ko-lives-login------lives). Lives can be adjusted for a single player or all player currently participating, and the adjustment may be relative (by using + and -) or absolute.
 
 ### Rounds per track
-If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. KOs will be performed after each round. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0. Use `/round <x>` to specify the number of rounds per map.
+If you want to play several rounds per track in Rounds, set the number of rounds as the point limit. KOs will be performed after each round. The plugin overrides the current points partition with a custom one where surviving players receive 1 point and knocked out players receive 0. Use `/round <x>` to specify the number of rounds per track.
 
 Note: it is recommended to disable tiebreakers and use 1 life for each player to avoid unwanted side effects.
 
@@ -222,15 +242,15 @@ A confirmation window will appear when opting out to ensure that the player opts
 
 ## Upgrading from previous versions
 
-### From 2.x.x
+### 2.x.x -> 3.0.0
 
-Version 3 requires version v2020-12-04 of TMGery. Installation now requires copying additional files `MethodsTmf.php` and `StructsTmf.php` to the `include` folder by unzipping the file into the TMGery folder.
+Version 3 requires version v2021-02-07 of TMGery. Installation now involves copying additional files `MethodsTmf.php` and `StructsTmf.php` to the `include` folder by unzipping the file into the TMGery folder.
 
 New admin commands:
 
 - /ko behaviour (playwarmup | forcespec | kick)
 
-### From v.082.9
+### v.082.9 -> 2.0.0
 
 Version 2 comes with some breaking changes. First, it requires version v2020-09-27 of TMGery and version 0.23 of the plugin manager, both have been updated to support the `EndRound` callback. Without this callback, no KOs will be performed.
 
