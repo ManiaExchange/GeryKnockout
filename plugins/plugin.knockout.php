@@ -9,6 +9,7 @@ namespace Knockout;
 const Version = '3.0.0 (beta)';
 const MinimumLogLevel = Log::Information;
 const AuthorSkipLimit = 10;
+const ResultsDirectory = 'results';
 
 require_once 'includes/MethodsTmf.php';
 require_once 'includes/StructsTmf.php';
@@ -564,7 +565,7 @@ abstract class Text
      * Finds and replaces formatting tags in a string using a callback function.
      *
      * @param string $text The text to modify.
-     * @param Callable $callback A function to replace found tags with.
+     * @param callable $callback A function to replace found tags with.
      *
      * It must support at least one argument, the argument being the tag string that was found. Its
      * capitalization is unaltered. For `$h`, `$l` and `$p` tags, an optional link is included in
@@ -1003,11 +1004,10 @@ class Results
         else return compare($a['Score'], $b['Score']);
     }
 
-    public function export()
+    public function exportToTextFile($directory)
     {
-        $directory = 'results';
         $fileName = sprintf('%s\\Knockout-%s.txt', $directory, date('ymd-Hi', $this->startTime));
-        $data = sprintf('Knockout event — %s%s', date('jS F Y, H:i', $this->startTime), "\n");
+        $data = sprintf("Knockout event — %s\n", date('jS F Y, H:i', $this->startTime));
 
         $finalResults = array_reverse($this->results);
         $i = 0;
@@ -1025,7 +1025,7 @@ class Results
             $isTie = $isTiedWithPlayerAbove || $isTiedWithPlayerBelow;
             if ($isTie) $data .= '=';
             $data .= sprintf(
-                '%d. %s (%s) (%d)',
+                "%d. %s (%s) (%d)\n",
                 $index + 1,
                 Text::clean($player['NickName']),
                 $player['Login'],
@@ -1044,7 +1044,7 @@ class Results
         }
         else
         {
-            Log::information("Results exported to {$fileName}");
+            Log::information("Results exported to {$directory}\{$fileName}");
         }
     }
 }
@@ -1449,7 +1449,7 @@ class PlayerList
     /**
      * Performs a callback function for each element in the player list.
      *
-     * @param callback $mapping The callback function to perform on each player in the list.
+     * @param callable $mapping The callback function to perform on each player in the list.
      */
     public function map($mapping)
     {
@@ -3821,7 +3821,7 @@ class KnockoutRuntime
                 elseif (count($playersInTheKO) < 1)
                 {
                     Chat::info('Everyone seems to have been knocked out!');
-                    $this->results->export();
+                    $this->results->exportToTextFile(ResultsDirectory);
                     $this->stop();
                     Log::information('Knockout completed with no winner');
                 }
@@ -3830,7 +3830,7 @@ class KnockoutRuntime
                     $winner = array_pop($playersInTheKO);
                     $this->results->insert($winner['Login'], $winner['NickName'], $this->roundNumber, $scores[0]['Score']);
                     Chat::info(sprintf("$<%s$> is the Champ!", Text::trim($winner['NickName'])));
-                    $this->results->export();
+                    $this->results->exportToTextFile(ResultsDirectory);
                     $this->stop();
                     Log::information('Knockout completed');
                 }
@@ -3863,7 +3863,7 @@ class KnockoutRuntime
                         if ($result === false)
                         {
                             Chat::info('Everyone seems to have been knocked out!');
-                            $this->results->export();
+                            $this->results->exportToTextFile(ResultsDirectory);
                             $this->stop();
                             Log::information('Knockout completed with no winner');
                         }
@@ -3872,7 +3872,7 @@ class KnockoutRuntime
                             $winner = array_pop($remainingPlayers);
                             $this->results->insert($winner['Login'], $winner['NickName'], $this->roundNumber, $scores[0]['Score']);
                             Chat::info(sprintf("$<%s$> is the Champ!", Text::trim($winner['NickName'])));
-                            $this->results->export();
+                            $this->results->exportToTextFile(ResultsDirectory);
                             $this->stop();
                             Log::information('Knockout completed');
                         }
@@ -4080,7 +4080,7 @@ class KnockoutRuntime
                     $player = array_pop($remainingPlayers);
                     $this->results->insert($player['Login'], $player['NickName'], $this->roundNumber, 0);
                 }
-                $this->results->export();
+                $this->results->exportToTextFile(ResultsDirectory);
             }
             $this->stop();
             UI::restoreDefaultScoreboard();
